@@ -1,6 +1,10 @@
 # 拾影 ShiYing
 
-一个给自己用的 Windows 视频下载器：粘贴链接（或整段分享文本），自动识别平台，选清晰度，下载。
+**免费开源的 Windows 视频下载器。** 粘贴链接就能下载 YouTube、哔哩哔哩（B站）、X（Twitter）、抖音视频（抖音无水印），像 IDM 一样多线程加速，还能用 AI 给英文视频生成中文字幕（Whisper 识别 + DeepL 翻译）。基于 yt-dlp，有图形界面，不用敲命令。
+
+A free, open-source **Windows GUI video downloader** for YouTube, Bilibili, X/Twitter and Douyin (no watermark), with multi-connection acceleration and AI-generated Chinese subtitles (Whisper + DeepL). A yt-dlp frontend — no command line needed. [English README](README.en.md)
+
+[下载最新版](https://github.com/Jaqennn/ShiYing/releases/latest) · [常见问题](#常见问题) · [轻投 LiteCast：安卓电视投屏](https://github.com/Jaqennn/LiteCast)
 
 ![拾影界面](docs/screenshot.png)
 
@@ -83,7 +87,7 @@ Windows 上 Chrome / Edge 127+ 的 Cookie 被系统级加密，任何第三方�
 
 设置 → 字幕：
 
-1. **识别引擎**：有 NVIDIA 显卡装 GPU 版（约 670MB，快很多），否则装 CPU 版（约 20MB）
+1. **识别引擎**：有 NVIDIA 显卡装 GPU 版（约 650MB，快很多），否则装 CPU 版（约 20MB）
 2. **识别模型**：快速 `base.en` / 均衡 `small.en` / 精准 `large-v3-turbo`（推荐，多语言）。默认从 hf-mirror.com 下载，国内不用代理
 3. **翻译**：填 DeepL 免费密钥（每月 50 万字符），或任何兼容 OpenAI 的大模型接口（DeepSeek、通义千问、Kimi…）。点「检测」确认能用
 4. 下载时勾选「下载完生成中文字幕」，或在已完成的视频上点「生成字幕」；本地视频点「给本地视频加字幕」
@@ -97,6 +101,29 @@ Windows 上 Chrome / Edge 127+ 的 Cookie 被系统级加密，任何第三方�
 | `视频名.zh.srt` | 中文 |
 | `视频名.zh-en.srt` | 中文在上、原文在下 |
 | `视频名.en.srt` | 原文（默认不生成，可在设置里勾选） |
+
+## 常见问题
+
+**抖音视频怎么下载无水印？**
+在抖音里点分享 → 复制链接，回到拾影就会自动识别，整段分享口令（「7.43 复制打开抖音……」）直接粘贴也行。拾影有独立的抖音解析模块，不需要登录、不需要 Cookie，下载的是无水印原视频，图集会下载原图。
+
+**B站视频怎么下载 1080P 或 4K？**
+不登录时 B站最高只给 480P / 720P。用浏览器扩展导出 B站的 `cookies.txt`，在设置里导入后就能下 1080P 高码率；4K 还需要大会员账号。见下面的 [Cookie](#cookie登录信息) 一节。
+
+**yt-dlp 有图形界面吗？不会用命令行怎么用 yt-dlp？**
+拾影就是 yt-dlp 的图形界面：粘贴链接、点清晰度、点下载。yt-dlp 本身作为组件放在旁边，网站改版时在设置里点「检查更新」即可，不用等拾影更新。
+
+**YouTube 下载提示「视频不可用」或「请确认你不是机器人」？**
+先在设置 → 组件里更新 yt-dlp 并安装 Deno（YouTube 现在要用它解签名）。还不行就换个代理节点，或者导入 YouTube 的 Cookie（建议用小号）。
+
+**下载速度慢，比 IDM 慢很多？**
+默认已开多线程加速：每个文件 16 个连接同时下载。实测和 IDM 速度相当（70～90 MB/s）。个别网站连接数太多会被限速，可以在设置里调成 8。
+
+**怎么给英文视频生成中文字幕？PotPlayer 能直接显示吗？**
+设置 → 字幕里装好识别引擎和模型、填 DeepL 密钥，下载时勾选「下载完生成中文字幕」，或在已下载的视频上点「生成字幕」。字幕和视频同名、放在同一文件夹，PotPlayer 打开视频会自动加载；右键 → 字幕可以切换中文 / 中英双语。
+
+**电脑里已有的视频能加字幕吗？**
+能。点「给本地视频加字幕」，选一个或多个视频即可。
 
 ## 抖音模块原理
 
@@ -126,6 +153,16 @@ web/                 界面（HTML/CSS/JS，pywebview 加载）
   mock.js            直接用浏览器打开 index.html 时的演示数据，方便调界面
 tests/               python -m pytest tests -q
 ```
+
+## 关于这个项目
+
+我把自己日常碰到的需求记下来，再用 AI（Claude）把它们做成软件，拾影是其中一个：起因是平时用 yt-dlp 命令行下视频太麻烦，抖音还下不了。代码、测试和界面都是 AI 写的，我负责提需求和在自己电脑上实测。
+
+同系列的其他项目：
+
+- [轻投 LiteCast](https://github.com/Jaqennn/LiteCast)：免费无广告的安卓电视 / 索尼电视投屏接收端，支持 iPhone AirPlay 镜像和 DLNA，用来替代收费的乐播投屏
+
+欢迎在 [Issues](https://github.com/Jaqennn/ShiYing/issues) 里反馈问题或提建议。
 
 ## 声明
 
