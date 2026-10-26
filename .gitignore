@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+dist/
+*.spec
+bin/
+.pytest_cache/
+*.part
+
+# 登录 Cookie（等于账号登录状态），绝不能传到 GitHub
+*cookies*.txt
+*cookie*.txt
+cookies/

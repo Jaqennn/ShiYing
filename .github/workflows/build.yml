@@ -1,0 +1,36 @@
+name: build-windows
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test
+        run: |
+          pip install pytest requests
+          python -m pytest tests -q
+      - name: Build
+        run: |
+          pip install -r requirements.txt pyinstaller
+          python -m PyInstaller --noconfirm --clean --windowed --name ShiYing --icon assets\icon.ico --add-data "web;web" main.py
+          Compress-Archive -Path dist\ShiYing -DestinationPath ShiYing-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ShiYing-windows-x64
+          path: ShiYing-windows-x64.zip
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ShiYing-windows-x64.zip
