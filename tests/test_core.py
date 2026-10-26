@@ -184,6 +184,7 @@ def test_explain_error():
 # ---------- 用假 yt-dlp 跑一遍完整下载流程（进度、合并、最终路径） ----------
 FAKE_YTDLP = r'''
 import sys, time
+sys.stdout.reconfigure(encoding="utf-8")   # 和真 yt-dlp 的 --encoding utf-8 一致（Windows 默认编码不是 UTF-8）
 args = sys.argv[1:]
 if "-J" in args:
     print('{"id":"abc","title":"测试视频","uploader":"up","duration":61,"thumbnail":"http://t/1.jpg",'
