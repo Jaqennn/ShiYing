@@ -118,6 +118,8 @@ def env(tmp_path, monkeypatch):
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
                         "-f", "lavfi", "-i", "color=c=black:s=320x240:d=3", "-shortest", "-c:a", "aac", "-c:v", "libx264",
                         str(video)], check=True)
+    else:
+        video.write_bytes(b"placeholder")   # 没有 ffmpeg 的机器（如 GitHub 的 Windows 打包机）：不需要真视频的测试照样能跑
     settings = {"sub_model": "large-v3-turbo", "sub_vad": True, "sub_translator": "deepl", "deepl_key": "k:fx",
                 "llm_base_url": base, "llm_key": "sk-test", "llm_model": "m",
                 "sub_outputs": {"zh": True, "bilingual": True, "en": True}, "sub_prefer_platform": True,
