@@ -16,7 +16,28 @@ A free, open-source **Windows GUI video downloader** for YouTube, Bilibili, X/Tw
 | 哔哩哔哩 | yt-dlp | 未登录最高 480P/720P，导入 Cookie 解锁 1080P 及以上 |
 | X (Twitter) | yt-dlp | 需要代理；敏感内容需 Cookie |
 | 抖音 | 内置解析模块 | 无水印，支持图集；不需要登录 |
-| 其他 | yt-dlp | yt-dlp 支持的上千个网站都可以试 |
+| 其他 1700+ 网站 | yt-dlp | Vimeo、TED、Twitch、Reddit、各国电视台等，见下方「支持哪些网站」 |
+
+## 支持哪些网站
+
+除了专门优化的四个平台，其他链接都会交给 yt-dlp 解析。yt-dlp 内置 1700 多个网站的专用解析器，界面上会显示真实的网站名。常见的有：
+
+| 类型 | 网站 |
+|---|---|
+| 视频网站 | Vimeo、TED、Dailymotion、Rumble、niconico、AcFun、西瓜视频、知乎 |
+| 直播平台（录播和剪辑） | Twitch、Kick、斗鱼、虎牙 |
+| 社交平台 | Reddit、Facebook、Instagram、Bluesky、Pinterest、Tumblr、LinkedIn、微博、小红书 |
+| 电视台 | BBC、NHK、ZDF、ARD、France TV、CBC、CCTV |
+| 音频 | SoundCloud、Bandcamp（清晰度选「音频」） |
+| 普通网页 | 网页里直接嵌的视频也可以试（通用解析） |
+
+几点说明：
+
+- 能不能下取决于网站当前的状态，网站改版后可能暂时失效，在设置 → 组件里更新 yt-dlp 通常就能恢复。完整列表见 yt-dlp 的 [supportedsites.md](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
+- Instagram、Facebook 等通常要登录：在设置 → 登录信息里给「其他网站」导入 cookies.txt
+- 电视台一般有地区限制，要用对应国家的代理节点；国内网站解析失败时，把设置里「其他」的代理勾掉再试
+- 普通网页里用了签名保护的播放器（如 JW Player），通用解析可能只拿到低清预览版
+- 有版权加密（DRM）的内容下载不了，比如各大视频网站的会员内容和 Netflix
 
 ## 功能
 

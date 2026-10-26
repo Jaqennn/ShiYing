@@ -123,6 +123,7 @@ def probe(url: str, platform: str, settings) -> dict:
 
     return {
         "engine": "ytdlp",
+        "site": _site_name(info, head, url),
         "url": url,
         "id": head.get("id") or info.get("id"),
         "title": info.get("title") or head.get("title") or "未命名",
@@ -133,6 +134,19 @@ def probe(url: str, platform: str, settings) -> dict:
         "qualities": qualities,
         "hint": hint,
     }
+
+
+def _site_name(info, head, url):
+    """其他网站显示真实域名（如 vimeo.com、ted.com），而不是笼统的「其他」。"""
+    dom = info.get("webpage_url_domain") or head.get("webpage_url_domain")
+    if not dom:
+        from urllib.parse import urlparse
+        dom = urlparse(head.get("webpage_url") or url).hostname or ""
+    dom = dom.lower()
+    for pre in ("www.", "m.", "mobile."):
+        if dom.startswith(pre):
+            dom = dom[len(pre):]
+    return dom
 
 
 def _best_thumb(info):

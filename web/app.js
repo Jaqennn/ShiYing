@@ -126,7 +126,7 @@ function renderSlip() {
       ${p.duration ? `<span class="dur">${fmtDur(p.duration)}</span>` : ""}
     </div>
     <div class="meta">
-      <div class="meta-line"><span class="tag ${p.platform}">${PLAT[p.platform]}</span>
+      <div class="meta-line"><span class="tag ${p.platform}">${esc(p.platform_name || PLAT[p.platform])}</span>
         ${p.uploader ? `<span>${esc(p.uploader)}</span>` : ""}${count ? `<span>${count}</span>` : ""}</div>
       <h3 title="${esc(p.title)}">${esc(p.title)}</h3>
       ${p.hint ? `<p class="hint-line">${esc(p.hint)}</p>` : ""}
@@ -503,7 +503,7 @@ function buildRow(t) {
   li.className = "row";
   li.dataset.id = t.id;
   li.innerHTML = `
-    <div class="thumb ph" data-l="${esc(PLAT[t.platform])}">
+    <div class="thumb ph" data-l="${esc((t.platform === "other" && t.site) || PLAT[t.platform])}">
       ${t.thumbnail ? `<img src="${esc(t.thumbnail)}" referrerpolicy="no-referrer" alt="" loading="lazy" onerror="this.remove()">` : ""}
     </div>
     <div class="row-main">
@@ -552,7 +552,7 @@ function renderRows() {
     empty.innerHTML = `<p>这里还没有${{ active: "进行中的", done: "已完成的", failed: "失败的" }[state.filter] || ""}任务</p>`;
   } else if (!list.length) {
     empty.innerHTML = `<p class="empty-title">复制一个视频链接，回到这里</p>
-      <p>窗口会自动认出剪贴板里的链接。支持 YouTube、哔哩哔哩、X、抖音，也可以试试其他网站。</p>`;
+      <p>窗口会自动认出剪贴板里的链接。支持 YouTube、哔哩哔哩、X、抖音，以及 Vimeo、TED、Twitch、Reddit 等上千个网站。</p>`;
   }
 }
 
@@ -622,7 +622,7 @@ async function refreshBanner() {
 
 /* ---------- 设置 ---------- */
 const QUALITY_OPTS = [["best", "最高画质"], ["2160", "4K"], ["1440", "2K"], ["1080", "1080P"], ["720", "720P"], ["480", "480P"], ["audio_m4a", "仅音频 M4A"]];
-const COOKIE_PLATS = ["youtube", "bilibili", "x", "douyin"];
+const COOKIE_PLATS = ["youtube", "bilibili", "x", "douyin", "other"];
 
 function openDrawer(focus) {
   $("#app").classList.add("drawer-open");
@@ -657,7 +657,7 @@ function renderSettings() {
       : c.mode === "browser"
         ? `<select data-k="cookies.${p}.browser">${["firefox", "edge", "chrome", "brave"].map((b) => `<option ${b === c.browser ? "selected" : ""}>${b}</option>`).join("")}</select>`
         : `<span style="color:var(--ink-3)">不登录</span>`;
-    return `<div class="cookie-row"><span class="tag ${p}">${PLAT[p]}</span>
+    return `<div class="cookie-row"><span class="tag ${p}">${p === "other" ? "其他网站" : PLAT[p]}</span>
       <select data-k="cookies.${p}.mode">
         <option value="none" ${c.mode === "none" ? "selected" : ""}>不使用</option>
         <option value="file" ${c.mode === "file" ? "selected" : ""}>cookies.txt</option>

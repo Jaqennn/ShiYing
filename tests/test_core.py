@@ -213,6 +213,9 @@ def test_fake_ytdlp_flow(tmp_path, monkeypatch):
     settings = {"proxy_mode": "none", "proxy_platforms": {}, "cookies": {"youtube": {"mode": "none"}, "bilibili": {"mode": "none"}},
                 "compat_mode": True, "container": "mp4", "filename_template": "%(title)s.%(ext)s"}
     info = ytdlp.probe("https://youtu.be/abc", "youtube", settings)
+    assert info["site"] == "youtu.be"
+    assert ytdlp._site_name({"webpage_url_domain": "www.TED.com"}, {}, "") == "ted.com"
+    assert ytdlp._site_name({}, {"webpage_url": "https://m.vimeo.com/123"}, "") == "vimeo.com"
     assert [q["key"] for q in info["qualities"]] == ["1080", "720", "audio_m4a", "audio_mp3"]
     assert info["qualities"][1]["sub"] == "60帧"
     assert info["qualities"][0]["size"] == 100_000_000

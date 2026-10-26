@@ -11,7 +11,7 @@ from .paths import DATA_DIR
 
 HISTORY_FILE = DATA_DIR / "history.json"
 ACTIVE = ("queued", "downloading", "merging")
-_PUBLIC = ("id", "url", "platform", "title", "uploader", "thumbnail", "duration", "quality",
+_PUBLIC = ("id", "url", "platform", "site", "title", "uploader", "thumbnail", "duration", "quality",
            "quality_label", "status", "progress", "speed", "eta", "downloaded", "total",
            "filepath", "error", "created", "finished", "count",
            "sub_status", "sub_progress", "sub_msg", "sub_error", "sub_files")
@@ -56,7 +56,7 @@ class TaskManager:
                 self.probes.pop(next(iter(self.probes)))
         public = {k: v for k, v in info.items() if not k.startswith("_")}
         public["probe_id"] = pid
-        public["platform_name"] = detect.PLATFORM_META[plat]["name"]
+        public["platform_name"] = (info.get("site") if plat == "other" else None) or detect.PLATFORM_META[plat]["name"]
         public["default_quality"] = self._pick_default(info["qualities"])
         return public
 
@@ -85,6 +85,7 @@ class TaskManager:
             tid = uuid.uuid4().hex[:10]
             task = {
                 "id": tid, "url": info["url"], "platform": info["platform"],
+                "site": info.get("site", ""),
                 "title": info["title"], "uploader": info.get("uploader", ""),
                 "thumbnail": info.get("thumbnail", ""), "duration": info.get("duration", 0),
                 "quality": q["key"], "quality_label": (q["label"] + (" " + q["sub"] if q.get("sub") else "")),

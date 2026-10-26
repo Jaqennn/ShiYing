@@ -20,7 +20,7 @@ and download engine. The interface is in Chinese.
 | Bilibili | yt-dlp | 1080p+ needs your cookies; 4K needs a premium account |
 | X / Twitter | yt-dlp | Highest quality without login |
 | Douyin | built-in parser | No watermark, image posts, no login needed |
-| Others | yt-dlp | Anything yt-dlp supports |
+| 1700+ other sites | yt-dlp | Vimeo, TED, Twitch, Reddit, Facebook, Instagram, Dailymotion, SoundCloud, BBC, NHK, ZDF and more |
 
 - **Batch**: paste several links at once (lines, spaces, even glued together), parse them in parallel,
   pick one quality for all, download everything with one click
@@ -32,6 +32,11 @@ and download engine. The interface is in Chinese.
   automatically. Existing human-made YouTube captions are used instead of speech recognition when present
 - Recognizes share text from Douyin and Bilibili apps, watches the clipboard, drag & drop
 - One-click install and update of yt-dlp, ffmpeg, Deno and whisper.cpp
+
+Any link that isn't one of the four main platforms goes to yt-dlp, which ships extractors for 1700+ sites
+([full list](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)); the real site name is shown in
+the app. Sites that need a login (Instagram, Facebook) work with a cookies.txt set for "other sites" in Settings;
+TV broadcasters are usually geo-restricted; DRM-protected content is not supported.
 
 ## Run
 

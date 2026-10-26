@@ -299,7 +299,7 @@ textarea { resize: vertical; min-height: 64px; font-family: var(--num); }
 .switch-row div { font-size: 13.5px; }
 .switch-row small { display: block; color: var(--ink-3); font-size: 12px; }
 
-.cookie-row { display: grid; grid-template-columns: 70px 110px 1fr; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
+.cookie-row { display: grid; grid-template-columns: 78px 110px 1fr; gap: 8px; align-items: center; margin: 8px 0; font-size: 13px; }
 .cookie-row .tag { font-weight: 500; }
 
 .comp { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 0; border-bottom: 1px dashed var(--rule); align-items: center; }
