@@ -20,8 +20,8 @@ DEFAULTS = {
     "fragments": 8,                     # m3u8/DASH 分片并发数
     "proxy_mode": "system",             # system / manual / none
     "proxy_url": "http://127.0.0.1:7890",
-    "proxy_platforms": {"youtube": True, "x": True, "bilibili": False, "douyin": False, "other": True,
-                        "translate": False},
+    "proxy_platforms": {"youtube": True, "x": True, "bilibili": False, "douyin": False, "wechat": False,
+                        "other": True, "translate": False},
     # 每个平台的 Cookie：none / file(cookies.txt) / browser(firefox 等)
     "cookies": {p: {"mode": "none", "file": "", "browser": "firefox"} for p in PLATFORMS},
     "douyin_cookie": "",                # 抖音兜底：浏览器里复制的 Cookie 字符串

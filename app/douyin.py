@@ -340,7 +340,7 @@ def download(probe: dict, quality: str, out_dir: Path, on_update, cancel_event, 
                 sp = meter.speed()
                 on_update({"status": "downloading", "progress": (meter.done / total) if total else 0,
                            "speed": sp, "eta": ((total - meter.done) / sp) if (sp and total) else None,
-                           "downloaded": meter.done, "total": total})
+                           "downloaded": meter.done, "total": total, "conns": meter.conns})
 
             fastdl.download(u, dest, headers=hdrs, proxy=proxy, connections=connections,
                             cancel=cancel_event, on_progress=tick, meter=meter, known=known)

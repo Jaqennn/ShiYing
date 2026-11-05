@@ -7,6 +7,7 @@ PLATFORM_META = {
     "bilibili": {"name": "哔哩哔哩", "folder": "Bilibili"},
     "x": {"name": "X", "folder": "X"},
     "douyin": {"name": "抖音", "folder": "Douyin"},
+    "wechat": {"name": "公众号", "folder": "WeChat"},
     "other": {"name": "其他", "folder": "Other"},
     "local": {"name": "本地", "folder": "Local"},
 }
@@ -16,13 +17,14 @@ _DOMAINS = {
     "bilibili": ("bilibili.com", "b23.tv", "bili2233.cn", "bilibili.tv"),
     "x": ("x.com", "twitter.com", "fxtwitter.com", "vxtwitter.com", "fixupx.com"),
     "douyin": ("douyin.com", "iesdouyin.com"),
+    "wechat": ("mp.weixin.qq.com",),
 }
 
 # URL 遇到空白、中文标点、引号就截断
 _URL_RE = re.compile(r"https?://[^\s<>\"'，。！？、；：（）【】《》「」　]+", re.I)
 # 没写 http 的裸域名，如 "youtu.be/xxx"、"b23.tv/xxx"
 _BARE_RE = re.compile(
-    r"(?<![\w./])((?:www\.|m\.|v\.)?(?:youtube\.com|youtu\.be|bilibili\.com|b23\.tv|x\.com|twitter\.com|douyin\.com|iesdouyin\.com)/[^\s<>\"'，。！？、；：（）【】《》「」　]+)",
+    r"(?<![\w./])((?:www\.|m\.|v\.)?(?:youtube\.com|youtu\.be|bilibili\.com|b23\.tv|x\.com|twitter\.com|douyin\.com|iesdouyin\.com|mp\.weixin\.qq\.com)/[^\s<>\"'，。！？、；：（）【】《》「」　]+)",
     re.I,
 )
 _BV_RE = re.compile(r"\b(BV[0-9A-Za-z]{10})\b")
@@ -103,6 +105,10 @@ def normalize(url: str, platform: str) -> str:
     if platform == "x":
         # fxtwitter / vxtwitter 等镜像改回 x.com
         url = re.sub(r"^https?://(?:www\.)?(?:fxtwitter|vxtwitter|fixupx|twitter)\.com", "https://x.com", url, flags=re.I)
+    if platform == "wechat":
+        # 从网页源码里复制的链接带 &amp;；#rd 之类的锚点没用
+        url = url.replace("&amp;", "&").split("#")[0]
+        url = re.sub(r"^http://", "https://", url, flags=re.I)
     if platform == "youtube":
         # music.youtube / m.youtube 交给 yt-dlp 处理即可；去掉播放列表参数之外不改动
         pass

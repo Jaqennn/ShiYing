@@ -2,7 +2,7 @@
 import os
 import sys
 
-from . import APP_NAME
+from . import APP_NAME, BUILD
 from .api import Api
 from .paths import WEB_DIR, ensure_dirs
 
@@ -17,7 +17,7 @@ def run():
 
     api = Api()
     window = webview.create_window(
-        APP_NAME,
+        f"{APP_NAME} {BUILD}" if BUILD else APP_NAME,
         url=str(WEB_DIR / "index.html"),
         js_api=api,
         width=1120,

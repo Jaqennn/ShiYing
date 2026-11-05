@@ -5,7 +5,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from . import APP_NAME, __version__, detect
+from . import APP_NAME, BUILD, __version__, detect
 from .components import ComponentManager
 from .netutil import open_file, read_clipboard, reveal, system_proxy
 from .paths import BIN_DIR, DATA_DIR
@@ -51,7 +51,7 @@ class Api:
     # ---------- 基本 ----------
     @api
     def app_info(self):
-        return {"name": APP_NAME, "version": __version__, "data_dir": str(DATA_DIR),
+        return {"name": APP_NAME, "version": __version__, "build": BUILD, "data_dir": str(DATA_DIR),
                 "bin_dir": str(BIN_DIR), "platform": sys.platform,
                 "missing": self._comps.missing()}
 

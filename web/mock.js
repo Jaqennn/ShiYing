@@ -8,7 +8,7 @@
     download_dir: "D:\\Videos\\拾影", split_by_platform: true, filename_template: "%(title).60s [%(id)s].%(ext)s",
     compat_mode: true, container: "mp4", default_quality: "1080", max_concurrent: 2, accelerate: true, connections: 16, fragments: 8,
     proxy_mode: "system", proxy_url: "http://127.0.0.1:7890", _system_proxy: "http://127.0.0.1:7890",
-    proxy_platforms: { youtube: true, x: true, bilibili: false, douyin: false, other: true, translate: false },
+    proxy_platforms: { youtube: true, x: true, bilibili: false, douyin: false, wechat: false, other: true, translate: false },
     cookies: { youtube: { mode: "none", file: "", browser: "firefox" }, bilibili: { mode: "file", file: "D:\\cookies\\bilibili.txt", browser: "firefox" },
       x: { mode: "browser", file: "", browser: "firefox" }, douyin: { mode: "none", file: "", browser: "firefox" }, other: { mode: "none", file: "", browser: "firefox" } },
     douyin_cookie: "", github_mirror: "", watch_clipboard: true, theme: "system",
@@ -17,7 +17,7 @@
   };
   const tasks = [
     { id: "a1", platform: "youtube", title: "一台老式胶片相机的完整拆解与清洁保养", thumbnail: thumb("#2f4858", "#86bbd8"),
-      quality: "1080", quality_label: "1080P 60帧", status: "downloading", progress: 0.42, speed: 6.3e6, eta: 38, downloaded: 2.1e8, total: 5.0e8, created: now - 60 },
+      quality: "1080", quality_label: "1080P 60帧", status: "downloading", progress: 0.42, speed: 6.3e6, eta: 38, downloaded: 2.1e8, total: 5.0e8, conns: 16, created: now - 60 },
     { id: "a2", platform: "bilibili", title: "【手工】用一整块木头做一把勺子，全程无剪辑", thumbnail: thumb("#6b4f3a", "#e3b778"),
       quality_label: "1080P", status: "merging", progress: 1, speed: 0, downloaded: 3.2e8, total: 3.2e8, created: now - 120 },
     { id: "a3", platform: "douyin", title: "清晨的海边，浪花一层一层退下去", thumbnail: thumb("#1b4965", "#bee9e8"),
@@ -60,11 +60,11 @@
 
   window.ShiYingMock = {
     app_info: () => ok({ name: "拾影", version: "0.1.0 (演示)", data_dir: "C:\\Users\\you\\AppData\\Roaming\\ShiYing", missing: ["deno"] }),
-    detect: (t) => ok(/youtu/.test(t) ? { platform: "youtube", url: t } : /douyin/.test(t) ? { platform: "douyin", url: t } : /b23|bilibili/.test(t) ? { platform: "bilibili", url: t } : { platform: "other", url: t }),
+    detect: (t) => ok(/youtu/.test(t) ? { platform: "youtube", url: t } : /weixin/.test(t) ? { platform: "wechat", url: t } : /douyin/.test(t) ? { platform: "douyin", url: t } : /b23|bilibili/.test(t) ? { platform: "bilibili", url: t } : { platform: "other", url: t }),
     clipboard: () => ok(""),
-    detect_all: (t) => ok((t.match(/https?:\/\/\S+/g) || []).map((u) => ({ url: u, platform: /youtu/.test(u) ? "youtube" : /douyin/.test(u) ? "douyin" : /b23|bilibili/.test(u) ? "bilibili" : /x\.com/.test(u) ? "x" : "other" }))),
+    detect_all: (t) => ok((t.match(/https?:\/\/\S+/g) || []).map((u) => ({ url: u, platform: /youtu/.test(u) ? "youtube" : /weixin/.test(u) ? "wechat" : /douyin/.test(u) ? "douyin" : /b23|bilibili/.test(u) ? "bilibili" : /x\.com/.test(u) ? "x" : "other" }))),
     parse: (t) => new Promise((r) => {
-      const plat = /douyin/.test(t) ? "douyin" : /b23|bilibili/.test(t) ? "bilibili" : /x\.com/.test(t) ? "x" : "youtube";
+      const plat = /weixin/.test(t) ? "wechat" : /douyin/.test(t) ? "douyin" : /b23|bilibili/.test(t) ? "bilibili" : /x\.com/.test(t) ? "x" : "youtube";
       if (/fail/.test(t)) return setTimeout(() => r({ ok: false, error: "这条推文里没有视频" }), 900);
       const variants = {
         youtube: probe,
@@ -73,6 +73,9 @@
           qualities: [{ key: "1080", label: "1080P", sub: "", size: 2.1e8 }, { key: "720", label: "720P", sub: "", size: 1.1e8 }, { key: "audio_m4a", label: "音频", sub: "M4A", size: 1.2e7 }] },
         douyin: { ...probe, probe_id: "p3", platform: "douyin", title: "清晨的海边，浪花一层一层退下去", uploader: "海边的小林", duration: 24, thumbnail: thumb("#1b4965", "#bee9e8"), hint: "",
           qualities: [{ key: "1080p", label: "1080P", sub: "最高", size: 0 }, { key: "720p", label: "720P", sub: "", size: 0 }, { key: "audio_m4a", label: "音频", sub: "M4A", size: 0 }] },
+        wechat: { ...probe, probe_id: "p5", platform: "wechat", platform_name: "公众号", title: "周末去山里看银杏：一条适合带孩子走的徒步路线", uploader: "城市周末", duration: 1915, thumbnail: thumb("#7a5c1f", "#e9c46a"), hint: "",
+          default_quality: "1080",
+          qualities: [{ key: "1080", label: "1080P", sub: "最高", size: 230071840 }, { key: "480", label: "480P", sub: "", size: 53267105 }, { key: "audio_m4a", label: "音频", sub: "M4A", size: 0 }] },
         x: { ...probe, probe_id: "p4", platform: "x", title: "Time-lapse of a city skyline from dusk to midnight", uploader: "@skyline_daily", duration: 1140, thumbnail: thumb("#22223b", "#9a8c98"), hint: "",
           qualities: [{ key: "2160", label: "4K", sub: "", size: 3.9e9 }, { key: "1080", label: "1080P", sub: "", size: 9.8e8 }, { key: "720", label: "720P", sub: "", size: 4.1e8 }, { key: "audio_m4a", label: "音频", sub: "M4A", size: 2e7 }] },
       };

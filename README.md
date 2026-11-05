@@ -1,8 +1,8 @@
 # 拾影 ShiYing
 
-**免费开源的 Windows 视频下载器。** 粘贴链接就能下载 YouTube、哔哩哔哩（B站）、X（Twitter）、抖音视频（抖音无水印），像 IDM 一样多线程加速，还能用 AI 给英文视频生成中文字幕（Whisper 识别 + DeepL 翻译）。基于 yt-dlp，有图形界面，不用敲命令。
+**免费开源的 Windows 视频下载器。** 粘贴链接就能下载 YouTube、哔哩哔哩（B站）、X（Twitter）、抖音（无水印）、微信公众号文章里的视频，像 IDM 一样多线程加速，还能用 AI 给英文视频生成中文字幕（Whisper 识别 + DeepL 翻译）。基于 yt-dlp，有图形界面，不用敲命令。
 
-A free, open-source **Windows GUI video downloader** for YouTube, Bilibili, X/Twitter and Douyin (no watermark), with multi-connection acceleration and AI-generated Chinese subtitles (Whisper + DeepL). A yt-dlp frontend — no command line needed. [English README](README.en.md)
+A free, open-source **Windows GUI video downloader** for YouTube, Bilibili, X/Twitter, Douyin (no watermark) and WeChat Official Account articles, with multi-connection acceleration and AI-generated Chinese subtitles (Whisper + DeepL). A yt-dlp frontend — no command line needed. [English README](README.en.md)
 
 [下载最新版](https://github.com/Jaqennn/ShiYing/releases/latest) · [常见问题](#常见问题) · [轻投 LiteCast：安卓电视投屏](https://github.com/Jaqennn/LiteCast)
 
@@ -16,11 +16,12 @@ A free, open-source **Windows GUI video downloader** for YouTube, Bilibili, X/Tw
 | 哔哩哔哩 | yt-dlp | 未登录最高 480P/720P，导入 Cookie 解锁 1080P 及以上 |
 | X (Twitter) | yt-dlp | 需要代理；敏感内容需 Cookie |
 | 抖音 | 内置解析模块 | 无水印，支持图集；不需要登录 |
+| 微信公众号 | 内置解析模块 | 文章里的视频，默认最高清晰度（公众号最高 1080P）；一篇多个视频会全部下载；不需要登录 |
 | 其他 1700+ 网站 | yt-dlp | Vimeo、TED、Twitch、Reddit、各国电视台等，见下方「支持哪些网站」 |
 
 ## 支持哪些网站
 
-除了专门优化的四个平台，其他链接都会交给 yt-dlp 解析。yt-dlp 内置 1700 多个网站的专用解析器，界面上会显示真实的网站名。常见的有：
+除了专门优化的五个平台，其他链接都会交给 yt-dlp 解析。yt-dlp 内置 1700 多个网站的专用解析器，界面上会显示真实的网站名。常见的有：
 
 | 类型 | 网站 |
 |---|---|
@@ -42,14 +43,14 @@ A free, open-source **Windows GUI video downloader** for YouTube, Bilibili, X/Tw
 ## 功能
 
 - **批量**：几个平台的链接一起粘贴（换行、空格隔开、甚至连在一起都行），一键解析，统一选清晰度，一键全部下载
-- **多线程加速**：像 IDM 一样把文件切块、16 个连接同时下；m3u8/DASH 分片流用 yt-dlp 并发分片；加速失败自动回退
+- **多线程加速**：像 IDM 一样把文件切块、16 个连接同时下，列表里显示正在用几个线程；服务器拒绝多出来的连接时，其余连接接着下，不会整个文件重来；m3u8/DASH 分片流用 yt-dlp 并发分片；加速失败自动回退
 - **中文字幕**：下载完（或任意本地视频）一键生成中文字幕。Whisper 在本机识别语音，DeepL 或大模型（DeepSeek 等）翻译，输出和视频同名的 `.zh.srt` / `.zh-en.srt`，PotPlayer 自动加载
-- 识别链接和分享文本：`7.43 复制打开抖音…https://v.douyin.com/xxx/`、`【标题】https://b23.tv/xxx`、裸 `BV号` 都行
+- 识别链接和分享文本：`7.43 复制打开抖音…https://v.douyin.com/xxx/`、`【标题】https://b23.tv/xxx`、公众号文章链接、裸 `BV号` 都行
 - 切回窗口时自动发现剪贴板里的链接；也支持 Ctrl+V、拖拽
 - 清晰度一目了然：4K / 2K / 1080P 60帧 …，带预估大小；仅音频 M4A / MP3
 - **兼容优先**（默认开）：同清晰度下选 H.264 + AAC，合并成 MP4，Windows 自带播放器直接能放
 - 下载队列：进度、速度、剩余时间、取消、重试、并发数可调；关掉程序后记录还在
-- 代理：默认 YouTube / X 走系统代理（Clash 等开“系统代理”即可），B站 / 抖音直连；可手动指定
+- 代理：默认 YouTube / X 走系统代理（Clash 等开“系统代理”即可），B站 / 抖音 / 公众号直连；可手动指定
 - 组件一键安装 / 更新：网站改版时点一下“检查更新”就能修好，不用重新打包软件
 - 浅色 / 深色主题
 
@@ -128,6 +129,14 @@ Windows 上 Chrome / Edge 127+ 的 Cookie 被系统级加密，任何第三方�
 **抖音视频怎么下载无水印？**
 在抖音里点分享 → 复制链接，回到拾影就会自动识别，整段分享口令（「7.43 复制打开抖音……」）直接粘贴也行。拾影有独立的抖音解析模块，不需要登录、不需要 Cookie，下载的是无水印原视频，图集会下载原图。
 
+**公众号文章里的视频怎么下载？**
+在微信里打开文章，点右上角「…」→ 复制链接，回到拾影就会自动识别（电脑版微信里点「用默认浏览器打开」后复制地址栏也行）。默认选最高清晰度，一般是 1080P。一篇文章里有多个视频时会全部下载，放在以文章标题命名的文件夹里。几点限制：
+
+- 视频号视频（文章里带视频号卡片的那种）是加密的，下载不了
+- 老文章里嵌的腾讯视频会交给 yt-dlp 下载，需要先装好 yt-dlp 组件
+- 提示「环境异常」是微信觉得访问太频繁，等几分钟再试
+- 开着「兼容优先」时只下 H.264 版本；关掉后会多出几个 H.265 的省流档
+
 **B站视频怎么下载 1080P 或 4K？**
 不登录时 B站最高只给 480P / 720P。用浏览器扩展导出 B站的 `cookies.txt`，在设置里导入后就能下 1080P 高码率；4K 还需要大会员账号。见下面的 [Cookie](#cookie登录信息) 一节。
 
@@ -155,6 +164,16 @@ Windows 上 Chrome / Edge 127+ 的 Cookie 被系统级加密，任何第三方�
 3. `playwm` → `play` 去水印；按 `ratio=1080p/720p/540p` 生成候选地址，下载时逐个尝试
 4. 图集直接下原图；失败且填了 Cookie 时，请求网页版详情页兜底
 
+## 公众号模块原理
+
+`app/wechat.py`，不依赖 yt-dlp，不需要登录：
+
+1. 用电脑浏览器 UA 打开文章页（`/s/xxx` 或 `/s?__biz=...` 都行）
+2. 页面脚本里的 `video_page_infos` → `mp_video_trans_info` 列出了每个视频的各档直链（`mpvideo.qpic.cn`）。`format_id` 100xx 是 H.264，101xx 是 H.265
+3. 按直链文件名把同一个视频的各档归到一起，按文章正文里的顺序排列，默认选最高档
+4. 直链带时效签名，下载失败时重新打开文章拿新地址再试一次
+5. 拿不到地址时，按页面里的状态标记（删除、违规、审核中、转码中、海外限制）或微信的提示页给出原因
+
 ## 项目结构
 
 ```
@@ -163,9 +182,10 @@ app/
   api.py             暴露给前端的接口
   tasks.py           解析缓存、下载队列、历史记录
   ytdlp.py           yt-dlp 子进程封装：清晰度整理、选格式、进度解析、报错翻译
-  fastdl.py          多连接分块下载引擎（YouTube / B站 / X / 抖音共用）
+  fastdl.py          多连接分块下载引擎（YouTube / B站 / X / 抖音 / 公众号共用）
   subtitle.py        字幕：whisper.cpp 识别、DeepL / 大模型翻译、SRT 输出、字幕队列
   douyin.py          抖音独立解析与下载
+  wechat.py          微信公众号文章视频解析与下载
   detect.py          从文本抠链接、识别平台
   components.py      yt-dlp / ffmpeg / deno 安装与更新
   settings.py        设置（%APPDATA%\ShiYing\settings.json）

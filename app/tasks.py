@@ -5,7 +5,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import components, detect, douyin, ytdlp
+from . import components, detect, douyin, wechat, ytdlp
 from .netutil import resolve_proxy
 from .paths import DATA_DIR
 
@@ -13,7 +13,7 @@ HISTORY_FILE = DATA_DIR / "history.json"
 ACTIVE = ("queued", "downloading", "merging")
 _PUBLIC = ("id", "url", "platform", "site", "title", "uploader", "thumbnail", "duration", "quality",
            "quality_label", "status", "progress", "speed", "eta", "downloaded", "total",
-           "filepath", "error", "created", "finished", "count",
+           "filepath", "error", "created", "finished", "count", "conns",
            "sub_status", "sub_progress", "sub_msg", "sub_error", "sub_files")
 
 
@@ -46,6 +46,8 @@ class TaskManager:
                     info = ytdlp.probe(url, plat, s)
                 else:
                     raise ValueError(str(e))
+        elif plat == "wechat":
+            info = self._parse_wechat(url)
         else:
             info = ytdlp.probe(url, plat, s)
         pid = uuid.uuid4().hex[:12]
@@ -57,8 +59,26 @@ class TaskManager:
         public = {k: v for k, v in info.items() if not k.startswith("_")}
         public["probe_id"] = pid
         public["platform_name"] = (info.get("site") if plat == "other" else None) or detect.PLATFORM_META[plat]["name"]
-        public["default_quality"] = self._pick_default(info["qualities"])
+        # 公众号默认最高清晰度（第一档就是最高）
+        public["default_quality"] = (info["qualities"][0]["key"] if info.get("engine") == "wechat"
+                                     else self._pick_default(info["qualities"]))
         return public
+
+    def _parse_wechat(self, url):
+        s = self.settings
+        try:
+            return wechat.parse(url, proxy=resolve_proxy(s, "wechat"), compat=bool(s["compat_mode"]))
+        except wechat.TencentVideo as e:
+            # 老文章里嵌的是腾讯视频：交给 yt-dlp
+            if not components.find("yt-dlp"):
+                raise ValueError("这篇文章里的是腾讯视频，需要先到设置 → 组件里安装 yt-dlp")
+            info = ytdlp.probe(e.urls[0], "wechat", s)
+            info["site"] = "腾讯视频"
+            if len(e.urls) > 1:
+                info["hint"] = f"文章里有 {len(e.urls)} 个腾讯视频，这里是第 1 个"
+            return info
+        except wechat.WechatError as e:
+            raise ValueError(str(e))
 
     def _pick_default(self, qualities):
         want = str(self.settings["default_quality"])
@@ -93,7 +113,8 @@ class TaskManager:
                 "downloaded": 0, "total": q.get("size") or 0, "filepath": "", "error": "",
                 "created": time.time(), "finished": None, "count": info.get("count", 1),
                 "_probe": info,
-                "_auto_sub": bool(auto_sub) and not q["key"].startswith("audio") and info.get("kind") != "images",
+                "_auto_sub": (bool(auto_sub) and not q["key"].startswith("audio")
+                              and info.get("kind") not in ("images", "videos")),
             }
             self.tasks[tid] = task
             self.order.insert(0, tid)
@@ -212,10 +233,15 @@ class TaskManager:
                                        proxy=resolve_proxy(self.settings, "douyin"),
                                        ffmpeg=components.find("ffmpeg"),
                                        connections=int(self.settings["connections"]) if self.settings["accelerate"] else 1)
+            elif info.get("engine") == "wechat":
+                path = wechat.download(info, task["quality"], out, upd, ev,
+                                       proxy=resolve_proxy(self.settings, "wechat"),
+                                       ffmpeg=components.find("ffmpeg"),
+                                       connections=int(self.settings["connections"]) if self.settings["accelerate"] else 1)
             else:
                 path = ytdlp.download(task, self.settings, out, upd, ev)
             with self.lock:
-                task.update(status="done", progress=1.0, speed=0, eta=None,
+                task.update(status="done", progress=1.0, speed=0, eta=None, conns=0,
                             filepath=path or str(out), finished=time.time())
             if task.get("_auto_sub") and self.on_done:
                 try:
@@ -225,9 +251,9 @@ class TaskManager:
         except Exception as e:
             with self.lock:
                 if task.get("_canceled"):
-                    task.update(status="canceled", speed=0, eta=None, error="")
+                    task.update(status="canceled", speed=0, eta=None, error="", conns=0)
                 else:
-                    task.update(status="error", speed=0, eta=None, error=str(e) or e.__class__.__name__)
+                    task.update(status="error", speed=0, eta=None, conns=0, error=str(e) or e.__class__.__name__)
                 task["finished"] = time.time()
         finally:
             self.cancels.pop(task["id"], None)
@@ -259,6 +285,8 @@ class TaskManager:
             if it.get("status") in ACTIVE:
                 it["status"] = "error"
                 it["error"] = "程序关闭时未完成"
+            if it.get("platform") not in detect.PLATFORM_META:
+                it["platform"] = "other"   # 测试版留下的记录（比如网盘）按「其他」显示
             if it.get("sub_status") not in (None, "", "done", "error"):
                 it["sub_status"], it["sub_msg"] = "", ""   # 关闭程序时没做完的字幕
             self.tasks[it["id"]] = it

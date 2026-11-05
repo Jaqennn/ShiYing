@@ -513,7 +513,7 @@ def fast_download(task, settings, out_dir: Path, on_update, cancel_event):
         done = meter.done
         on_update({"status": "downloading", "progress": (done / total) if total else 0.0,
                    "speed": sp, "eta": ((total - done) / sp) if (sp > 0 and total) else None,
-                   "downloaded": done, "total": total})
+                   "downloaded": done, "total": total, "conns": meter.conns})
 
     tick(force=True)
     temps = []

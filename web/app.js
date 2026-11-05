@@ -6,7 +6,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const PLAT = {
-  youtube: "YouTube", bilibili: "哔哩哔哩", x: "X", douyin: "抖音", other: "其他", local: "本地",
+  youtube: "YouTube", bilibili: "哔哩哔哩", x: "X", douyin: "抖音", wechat: "公众号", other: "其他", local: "本地",
 };
 
 /* ---------- 后端调用 ---------- */
@@ -112,8 +112,9 @@ async function parse(text) {
 
 function renderSlip() {
   const p = state.probe;
-  const tall = p.platform === "douyin";
+  const tall = p.platform === "douyin" || !!p.vertical;
   const count = p.count > 1 ? (p.kind === "images" ? `图集 ${p.count} 张` : `共 ${p.count} 个视频`) : "";
+  const noSub = p.kind === "images" || p.kind === "videos";
   const stamps = p.qualities.map((q) => {
     const sub = [q.sub, q.size ? "约 " + fmtBytes(q.size) : ""].filter(Boolean).join(" ");
     return `<button class="stamp ${q.key.startsWith("audio") ? "audio" : ""}" data-q="${esc(q.key)}"
@@ -134,7 +135,7 @@ function renderSlip() {
       <div class="actions">
         <button class="seal-btn" id="dlBtn">下载</button>
         <button class="ghost" id="dismissBtn">取消</button>
-        ${p.kind === "images" ? "" : subCheck("autoSub")}
+        ${noSub ? "" : subCheck("autoSub")}
         <span class="note">${esc(saveNote(p.platform))}</span>
       </div>
     </div>`;
@@ -147,7 +148,7 @@ function subCheck(id) {
 function saveNote(platform) {
   const s = state.settings;
   if (!s) return "";
-  const folders = { youtube: "YouTube", bilibili: "Bilibili", x: "X", douyin: "Douyin", other: "Other" };
+  const folders = { youtube: "YouTube", bilibili: "Bilibili", x: "X", douyin: "Douyin", wechat: "WeChat", other: "Other" };
   const dir = s.download_dir + (s.split_by_platform ? "\\" + folders[platform] : "");
   return "保存到 " + dir;
 }
@@ -451,7 +452,8 @@ function rowSub(t) {
     case "downloading": {
       const pct = Math.floor((t.progress || 0) * 100);
       const size = t.total ? `${fmtBytes(t.downloaded)} / ${fmtBytes(t.total)}` : (t.downloaded ? fmtBytes(t.downloaded) : "");
-      return `<span class="pct">${pct}%</span>${t.speed ? `<span>${fmtBytes(t.speed)}/s</span>` : ""}
+      const conns = t.conns > 1 ? `<span class="conns" title="同时在下载的连接数">${t.conns} 线程</span>` : t.conns === 1 ? `<span class="conns one">单线程</span>` : "";
+      return `<span class="pct">${pct}%</span>${t.speed ? `<span>${fmtBytes(t.speed)}/s</span>` : ""}${conns}
         ${size ? `<span>${size}</span>` : ""}${t.eta != null ? `<span>${fmtEta(t.eta)}</span>` : ""}
         <span class="muted">${esc(t.quality_label)}</span>`;
     }
@@ -517,7 +519,7 @@ function buildRow(t) {
 }
 
 function updateRow(li, t) {
-  const sig = [t.status, Math.floor((t.progress || 0) * 1000), Math.round(t.speed / 1024), Math.round(t.eta || 0), t.error,
+  const sig = [t.status, Math.floor((t.progress || 0) * 1000), Math.round(t.speed / 1024), Math.round(t.eta || 0), t.error, t.conns,
     t.sub_status, t.sub_msg, t.sub_error].join("|");
   if (li._sig === sig) return;
   const actKey = t.status + "|" + (t.sub_status || "");
@@ -552,7 +554,7 @@ function renderRows() {
     empty.innerHTML = `<p>这里还没有${{ active: "进行中的", done: "已完成的", failed: "失败的" }[state.filter] || ""}任务</p>`;
   } else if (!list.length) {
     empty.innerHTML = `<p class="empty-title">复制一个视频链接，回到这里</p>
-      <p>窗口会自动认出剪贴板里的链接。支持 YouTube、哔哩哔哩、X、抖音，以及 Vimeo、TED、Twitch、Reddit 等上千个网站。</p>`;
+      <p>窗口会自动认出剪贴板里的链接。支持 YouTube、哔哩哔哩、X、抖音、微信公众号，以及 Vimeo、TED、Twitch、Reddit 等上千个网站。</p>`;
   }
 }
 
@@ -614,7 +616,7 @@ async function refreshBanner() {
   const b = $("#setupBanner");
   if (!info || !info.missing.length) { b.hidden = true; return; }
   const names = info.missing.join("、");
-  b.innerHTML = `<span>还缺 ${esc(names)}，YouTube / 哔哩哔哩 / X 暂时下不了（抖音不受影响）</span>
+  b.innerHTML = `<span>还缺 ${esc(names)}，YouTube / 哔哩哔哩 / X 暂时下不了（抖音、公众号不受影响）</span>
     <button class="text" id="bannerGo">去安装</button>`;
   b.hidden = false;
   $("#bannerGo").onclick = () => openDrawer("components");
@@ -679,7 +681,7 @@ function renderSettings() {
       <input type="checkbox" class="switch" data-k="accelerate" ${s.accelerate ? "checked" : ""}></div>
     ${s.accelerate ? `<div class="field"><span>每个文件连接数</span>${seg("connections", s.connections, [[4, "4"], [8, "8"], [16, "16"], [32, "32"]])}</div>
     <div class="field"><span></span><small style="margin:0">一般 16 就够；个别网站连接太多会被限速或报错，可以调小</small></div>` : ""}
-    <div class="switch-row"><div>按平台分文件夹<small>YouTube、Bilibili、X、Douyin 各放一个子文件夹</small></div>
+    <div class="switch-row"><div>按平台分文件夹<small>YouTube、Bilibili、X、Douyin、WeChat 各放一个子文件夹</small></div>
       <input type="checkbox" class="switch" data-k="split_by_platform" ${s.split_by_platform ? "checked" : ""}></div>
   </section>
 
@@ -721,7 +723,7 @@ function renderSettings() {
     <div class="field"><span>代理</span>${seg("proxy_mode", s.proxy_mode, [["system", "跟随系统"], ["manual", "手动"], ["none", "不使用"]])}</div>
     ${s.proxy_mode === "system" ? `<div class="field"><span></span><small style="margin:0">${s._system_proxy ? "检测到系统代理 " + esc(s._system_proxy) : "未检测到系统代理（Clash 等需打开“系统代理”）"}</small></div>` : ""}
     ${s.proxy_mode === "manual" ? `<div class="field"><label>代理地址</label><input class="input" data-k="proxy_url" value="${esc(s.proxy_url)}" placeholder="http://127.0.0.1:7890"></div>` : ""}
-    <div class="field top-align"><span>走代理的平台</span><div>${["youtube", "x", "bilibili", "douyin", "other", "translate"].map((p) =>
+    <div class="field top-align"><span>走代理的平台</span><div>${["youtube", "x", "bilibili", "douyin", "wechat", "other", "translate"].map((p) =>
       `<label class="check"><input type="checkbox" data-k="proxy_platforms.${p}" ${s.proxy_platforms[p] ? "checked" : ""}>${p === "translate" ? "字幕翻译接口" : PLAT[p]}</label>`).join("")}</div></div>
   </section>
 
@@ -750,7 +752,7 @@ function renderSettings() {
   </section>`;
 
   call("app_info").then((i) => {
-    $("#aboutLine").innerHTML = `拾影 ${esc(i.version)}　配置目录 ${esc(i.data_dir)}<br>仅供个人学习备份使用，请尊重创作者版权。`;
+    $("#aboutLine").innerHTML = `拾影 ${esc(i.version)}${i.build ? " " + esc(i.build) : ""}　配置目录 ${esc(i.data_dir)}<br>仅供个人学习备份使用，请尊重创作者版权。`;
   }).catch(() => {});
 }
 
@@ -917,6 +919,13 @@ function applyTheme() {
   backend = await ready();
   try { state.settings = await call("get_settings"); } catch (e) { toast(e.message); }
   applyTheme();
+  call("app_info").then((i) => {
+    if (!i.build) return;
+    const b = $("#buildBadge");
+    b.textContent = i.build;
+    b.hidden = false;
+    document.title = "拾影 " + i.build;
+  }).catch(() => {});
   poll(true);
   refreshBanner();
   input.focus();

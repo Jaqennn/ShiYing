@@ -1,11 +1,12 @@
 # ShiYing (拾影)
 
 **A free, open-source Windows video downloader with a GUI.** Paste a link to download videos from
-YouTube, Bilibili, X (Twitter) and Douyin (Chinese TikTok, without watermark). Downloads use multiple
+YouTube, Bilibili, X (Twitter), Douyin (Chinese TikTok, without watermark) and WeChat Official Account
+articles. Downloads use multiple
 connections like IDM, and English videos can get AI-generated Chinese subtitles (local Whisper
 speech recognition + DeepL or any OpenAI-compatible LLM for translation).
 
-It is a graphical frontend for [yt-dlp](https://github.com/yt-dlp/yt-dlp), plus its own Douyin parser
+It is a graphical frontend for [yt-dlp](https://github.com/yt-dlp/yt-dlp), plus its own Douyin and WeChat parsers
 and download engine. The interface is in Chinese.
 
 [中文说明](README.md) · [Download](https://github.com/Jaqennn/ShiYing/releases/latest)
@@ -20,6 +21,7 @@ and download engine. The interface is in Chinese.
 | Bilibili | yt-dlp | 1080p+ needs your cookies; 4K needs a premium account |
 | X / Twitter | yt-dlp | Highest quality without login |
 | Douyin | built-in parser | No watermark, image posts, no login needed |
+| WeChat articles | built-in parser | Videos in Official Account articles (`mp.weixin.qq.com/s/...`), highest quality (up to 1080p) by default; WeChat Channels videos are encrypted and not supported |
 | 1700+ other sites | yt-dlp | Vimeo, TED, Twitch, Reddit, Facebook, Instagram, Dailymotion, SoundCloud, BBC, NHK, ZDF and more |
 
 - **Batch**: paste several links at once (lines, spaces, even glued together), parse them in parallel,
@@ -33,7 +35,7 @@ and download engine. The interface is in Chinese.
 - Recognizes share text from Douyin and Bilibili apps, watches the clipboard, drag & drop
 - One-click install and update of yt-dlp, ffmpeg, Deno and whisper.cpp
 
-Any link that isn't one of the four main platforms goes to yt-dlp, which ships extractors for 1700+ sites
+Any link that isn't one of the five main platforms goes to yt-dlp, which ships extractors for 1700+ sites
 ([full list](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)); the real site name is shown in
 the app. Sites that need a login (Instagram, Facebook) work with a cookies.txt set for "other sites" in Settings;
 TV broadcasters are usually geo-restricted; DRM-protected content is not supported.
