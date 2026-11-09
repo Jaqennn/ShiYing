@@ -58,9 +58,9 @@
     default_quality: "1080",
   };
 
-  // 演示场景：index.html?demo=setup（第一次打开）/ installing（正在装）/ empty（空列表）
+  // 演示场景：index.html?demo=setup（第一次打开）/ partial（以前装过一部分）/ installing（正在装）/ empty（空列表）
   const demo = new URLSearchParams(location.search).get("demo") || "";
-  if (demo === "empty" || demo === "setup" || demo === "installing") tasks.length = 0;
+  if (["empty", "setup", "partial", "installing"].includes(demo)) tasks.length = 0;
   const MB = 1048576;
   const plan = {
     items: [
@@ -75,6 +75,7 @@
     gpu: true, recommended_model: "model:large-v3-turbo", missing: ["yt-dlp", "ffmpeg", "deno"],
     location: "C:\\Users\\you\\AppData\\Local\\ShiYing", mirror: "", default_mirror: "https://ghfast.top/",
   };
+  if (demo === "partial") { plan.items[0].installed = plan.items[1].installed = true; plan.missing = ["deno"]; }
   let job = null;
   const labelOf = (k) => (k === "engine" ? "识别引擎（GPU 版）" : k.startsWith("model:") ? "识别模型 · " + plan.items.find((i) => i.key === k).label : k);
   function startJob(keys, at = 0) {
@@ -103,7 +104,7 @@
 
   window.ShiYingMock = {
     app_info: () => ok({ name: "拾影", version: "0.5.0 (演示)", data_dir: "C:\\Users\\you\\AppData\\Roaming\\ShiYing",
-      missing: demo === "setup" || demo === "installing" ? ["yt-dlp", "ffmpeg", "deno"] : [], setup_skip: false, setup: jobView() }),
+      missing: ["setup", "partial", "installing"].includes(demo) ? plan.missing : [], setup_skip: false, setup: jobView() }),
     setup_plan: () => ok({ ...JSON.parse(JSON.stringify(plan)), job: jobView() }),
     setup_start: (keys) => { startJob(keys); return ok(jobView()); },
     setup_status: () => ok(jobView()),

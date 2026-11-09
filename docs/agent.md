@@ -55,7 +55,19 @@ $rel.tag_name
 
 ## 第 3 步：解压
 
-先看拾影是不是正开着（升级时会遇到）：
+先看以前有没有装过拾影、装在哪（桌面快捷方式指向的程序，和正在运行的拾影）：
+
+```powershell
+$sh = New-Object -ComObject WScript.Shell
+Get-ChildItem ([Environment]::GetFolderPath('Desktop')) -Filter *.lnk |
+  ForEach-Object { $sh.CreateShortcut($_.FullName).TargetPath } | Where-Object { $_ -like '*\ShiYing.exe' }
+Get-Process ShiYing -ErrorAction SilentlyContinue | Select-Object Path
+```
+
+- 没有输出：第一次装，按下面的默认位置装。
+- 有输出（比如 `D:\Tools\ShiYing\ShiYing.exe`）：这是升级。下面的 `$programs` 改成这个 `ShiYing` 文件夹的上一级（例子里是 `D:\Tools`），这样会覆盖旧版本，快捷方式也不用重建。组件和设置不在这个文件夹里，不会丢，也不用重装。
+
+再看拾影是不是正开着：
 
 ```powershell
 Get-Process ShiYing -ErrorAction SilentlyContinue
@@ -64,7 +76,7 @@ Get-Process ShiYing -ErrorAction SilentlyContinue
 有输出就请用户先关掉拾影（正在下载的任务会中断），或者征得同意后运行 `Get-Process ShiYing | Stop-Process`。然后：
 
 ```powershell
-$programs = "$env:LOCALAPPDATA\Programs"
+$programs = "$env:LOCALAPPDATA\Programs"   # 升级时改成旧 ShiYing 文件夹的上一级
 New-Item -ItemType Directory -Force $programs | Out-Null
 Expand-Archive -Force $zip $programs
 $dest = "$programs\ShiYing"
@@ -78,7 +90,7 @@ Remove-Item $zip
 - `Unblock-File` 去掉「从网上下载」的标记，这样打开时一般不会再弹「Windows 已保护你的电脑」。
 - 升级就是覆盖解压：设置、下载记录、组件和模型都不在这个文件夹里，不会丢。
 
-建一个桌面快捷方式，名字是「拾影」（用字符编码写这两个字，避免命令行乱码）：
+第一次装时建一个桌面快捷方式，名字是「拾影」（用字符编码写这两个字，避免命令行乱码）；升级时桌面上已经有指向 `ShiYing.exe` 的快捷方式，就跳过这一步：
 
 ```powershell
 $name = [string][char]0x62FE + [char]0x5F71
@@ -93,11 +105,12 @@ Test-Path $lnk
 ## 第 4 步：打开拾影，装组件
 
 ```powershell
-Start-Process "$env:LOCALAPPDATA\Programs\ShiYing\ShiYing.exe"
+Start-Process "$dest\ShiYing.exe"
 ```
 
 告诉用户：
 
+- 升级的话，以前装好的组件会自动找到，都在就不会弹出向导；只缺某一个时，向导里装好的显示「已装好」，只下载缺的那个。
 - 第一次打开会弹出「装好组件就能开始下载」的安装向导，点右下角的「一键安装」，等进度条走完（一共要下载约 260 MB，网速快一两分钟）。
 - 进度很慢（每秒不到 200 KB）时，向导里会出现「换加速镜像」，点它就行。
 - 想给英文视频生成中文字幕，可以在向导里顺便勾上「给英文视频生成中文字幕」，不需要可以不勾，以后在设置里也能装。
@@ -143,7 +156,7 @@ Remove-Item -Recurse -Force $tmp
 ## 第 6 步：验收（必须）
 
 ```powershell
-$dest = "$env:LOCALAPPDATA\Programs\ShiYing"
+$dest = "$env:LOCALAPPDATA\Programs\ShiYing"   # 装在别处（升级的情况）就换成那个 ShiYing 文件夹
 $bin = "$env:LOCALAPPDATA\ShiYing\bin"
 Test-Path "$dest\ShiYing.exe"
 Get-Process ShiYing -ErrorAction SilentlyContinue | Select-Object Id, MainWindowTitle
@@ -168,7 +181,7 @@ Get-Process ShiYing -ErrorAction SilentlyContinue | Select-Object Id, MainWindow
 
 ```powershell
 Get-Process ShiYing -ErrorAction SilentlyContinue | Stop-Process
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\ShiYing"   # 程序
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Programs\ShiYing"   # 程序（装在别处就换成那个 ShiYing 文件夹）
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\ShiYing"            # 组件和识别模型，最占空间
 Remove-Item -Recurse -Force "$env:APPDATA\ShiYing"                 # 设置和下载记录
 $name = [string][char]0x62FE + [char]0x5F71

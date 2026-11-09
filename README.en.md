@@ -73,7 +73,14 @@ If you use an AI agent that can run commands on your PC (Claude Code, Codex and 
 
 ### Upgrading
 
-Close ShiYing, unzip the new `ShiYing-windows-x64.zip` over the old `ShiYing` folder. Settings, history, components and models are stored elsewhere, so nothing is lost and nothing needs reinstalling.
+Settings, history, components and models are not stored in the ShiYing folder, so nothing is lost and components are not downloaded again: the new version finds the ones already installed and only installs what is missing.
+
+Close ShiYing first, then pick one:
+
+- Simple: unzip the new package anywhere and open the new `ShiYing.exe`. Once it works, delete the old `ShiYing` folder. Recreate your desktop shortcut.
+- Overwrite (keeps your shortcut): right-click the new zip → "Extract All" → "Browse", choose the folder that contains the old `ShiYing` folder (if the old one is `D:\Tools\ShiYing`, choose `D:\Tools`) → "Extract" → when asked, choose "Replace the files in the destination". Don't keep the default destination and don't choose the `ShiYing` folder itself, or you get a nested folder and the old version stays.
+
+Not sure where the old one is? Right-click the ShiYing shortcut on the desktop → "Open file location"; the folder that opens is `ShiYing`, and the one above it in the address bar is where to extract.
 
 ## First use
 
