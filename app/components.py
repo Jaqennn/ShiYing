@@ -73,8 +73,8 @@ def version(name: str):
         return "无法运行"
 
 
-def _idle():
-    return {"status": "idle", "progress": 0.0, "message": "", "done": 0, "total": 0, "speed": 0}
+def _idle(**over):
+    return {"status": "idle", "progress": 0.0, "message": "", "done": 0, "total": 0, "speed": 0, **over}
 
 
 class ComponentManager:
@@ -123,7 +123,7 @@ class ComponentManager:
             return False
         if self.get(name)["status"] == "working":
             return True
-        self._set(name, **_idle(), status="working", message="准备下载…")
+        self._set(name, **_idle(status="working", message="准备下载…"))
         threading.Thread(target=self.install, args=(name,), daemon=True).start()
         return True
 
@@ -135,7 +135,7 @@ class ComponentManager:
         """装（或更新）一个组件，装完返回 True。出错时状态里写明原因并返回 False。"""
         stop = self._stop[name]
         stop.clear()
-        self._set(name, **_idle(), status="working", message="准备下载…")
+        self._set(name, **_idle(status="working", message="准备下载…"))
         try:
             if not IS_WIN:
                 raise RuntimeError("自动安装只支持 Windows，其他系统请用包管理器安装")
@@ -164,7 +164,7 @@ class ComponentManager:
             self._set(name, status="done", progress=1.0, speed=0, message="已安装 " + (version(name) or ""))
             return True
         except fetch.Stopped:
-            self._set(name, **_idle(), message="已停止")
+            self._set(name, **_idle(message="已停止"))
             return False
         except Exception as e:
             self._set(name, status="error", speed=0, message=_friendly(e))

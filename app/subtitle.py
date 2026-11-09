@@ -191,7 +191,7 @@ class Assets:
             return False
         if self._get("model:" + key)["status"] == "working":
             return True
-        self._set("model:" + key, **_idle(), status="working", message="准备下载…")
+        self._set("model:" + key, **_idle(status="working", message="准备下载…"))
         threading.Thread(target=self.install_model, args=(key,), daemon=True).start()
         return True
 
@@ -199,7 +199,7 @@ class Assets:
         """下载一个识别模型（顺带装上不到 1MB 的静音检测模型），装好返回 True。"""
         k = "model:" + key
         stop = self._stop_event(k)
-        self._set(k, **_idle(), status="working", message="准备下载…")
+        self._set(k, **_idle(status="working", message="准备下载…"))
         try:
             self._hf_download(k, MODEL_REPO, MODELS[key]["file"], model_path(key), 10_000_000, stop)
             if not (MODELS_DIR / VAD["file"]).exists():
@@ -213,7 +213,7 @@ class Assets:
             self._set(k, status="done", progress=1.0, speed=0, message="已下载")
             return True
         except fetch.Stopped:
-            self._set(k, **_idle(), message="已停止")
+            self._set(k, **_idle(message="已停止"))
             return False
         except Exception as e:
             self._set(k, status="error", speed=0, message=str(e)[:200])
@@ -222,7 +222,7 @@ class Assets:
     def install_engine_async(self, gpu: bool):
         if self._get("engine")["status"] == "working":
             return True
-        self._set("engine", **_idle(), status="working", message="查询最新版本…")
+        self._set("engine", **_idle(status="working", message="查询最新版本…"))
         threading.Thread(target=self.install_engine, args=(gpu,), daemon=True).start()
         return True
 
@@ -247,7 +247,7 @@ class Assets:
     def install_engine(self, gpu):
         """装识别引擎（GPU 版 600 多 MB，CPU 版 20MB 左右），装好返回 True。"""
         stop = self._stop_event("engine")
-        self._set("engine", **_idle(), status="working", message="查询最新版本…")
+        self._set("engine", **_idle(status="working", message="查询最新版本…"))
         tmp = BIN_DIR / "whisper-download.zip"
         try:
             if not IS_WIN:
@@ -265,7 +265,7 @@ class Assets:
             self._set("engine", status="done", progress=1.0, speed=0, message=("GPU 版" if gpu else "CPU 版") + "已安装")
             return True
         except fetch.Stopped:
-            self._set("engine", **_idle(), message="已停止")
+            self._set("engine", **_idle(message="已停止"))
             return False
         except Exception as e:
             msg = str(e)
@@ -279,8 +279,8 @@ class Assets:
             tmp.unlink(missing_ok=True)
 
 
-def _idle():
-    return {"status": "idle", "progress": 0.0, "message": "", "done": 0, "total": 0, "speed": 0}
+def _idle(**over):
+    return {"status": "idle", "progress": 0.0, "message": "", "done": 0, "total": 0, "speed": 0, **over}
 
 
 def install_whisper_zip(zip_path: Path, target: Path, build: str):
