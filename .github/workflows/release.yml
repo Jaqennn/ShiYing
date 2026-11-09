@@ -42,12 +42,12 @@ jobs:
         env:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          $v = (Select-String -Path app/__init__.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
+          $v = (Select-String -Path app/__init__.py -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
           $notes = "docs/release-notes/$v.md"
           "version=$v" >> $env:GITHUB_OUTPUT
           "tag=v$v" >> $env:GITHUB_OUTPUT
           "notes=$notes" >> $env:GITHUB_OUTPUT
-          $build = (Select-String -Path app/__init__.py -Pattern '^BUILD = "(.*)"').Matches[0].Groups[1].Value
+          $build = (Select-String -Path app/__init__.py -Pattern '^BUILD = "([^"]*)"').Matches[0].Groups[1].Value
           if ($env:DRY_RUN -ne "true") {
             git rev-parse -q --verify "refs/tags/v$v" *> $null
             if ($LASTEXITCODE -eq 0) { Write-Output "::error::v$v 已经发布过，先改 app/__init__.py 里的版本号"; exit 1 }
