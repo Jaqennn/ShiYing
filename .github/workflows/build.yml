@@ -1,12 +1,15 @@
 name: build-windows
 
+# 每次推送和 PR 都在 Windows 上跑测试、打一个测试包（在 Actions 页面下载）。
+# 正式发布用 release.yml。
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -18,31 +21,14 @@ jobs:
           python-version: "3.12"
       - name: Test
         run: |
-          pip install pytest requests
+          pip install -r requirements.txt pytest
           python -m pytest tests -q
       - name: Build
         run: |
-          pip install -r requirements.txt pyinstaller
+          pip install pyinstaller
           python -m PyInstaller --noconfirm --clean --windowed --name ShiYing --icon assets\icon.ico --add-data "web;web" main.py
           Compress-Archive -Path dist\ShiYing -DestinationPath ShiYing-windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
           name: ShiYing-windows-x64
           path: ShiYing-windows-x64.zip
-      - name: Release notes
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: pwsh
-        run: |
-          # 从 CHANGELOG.md 里取出这个版本那一节，作为下载页的说明
-          $tag = "${{ github.ref_name }}"
-          $text = Get-Content CHANGELOG.md -Raw -Encoding utf8
-          $m = [regex]::Match($text, "(?ms)^## " + [regex]::Escape($tag) + "[^\n]*\n(.*?)(?=^## |\z)")
-          $body = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "" }
-          Set-Content -Path release-notes.md -Value $body -Encoding utf8
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: 拾影 ${{ github.ref_name }}
-          body_path: release-notes.md
-          files: ShiYing-windows-x64.zip

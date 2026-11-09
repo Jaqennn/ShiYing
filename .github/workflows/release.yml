@@ -1,0 +1,104 @@
+name: Release
+
+# 在 Windows 上测试、打包 ShiYing-windows-x64.zip，按 app/__init__.py 里的版本号发布，
+# 发布说明写在 docs/release-notes/<版本>.md。手动运行（Actions → Release → Run workflow）或通过 API 触发。
+# 安装包每一版都叫 ShiYing-windows-x64.zip，所以说明页里的
+# releases/latest/download/ShiYing-windows-x64.zip 永远指向最新版。
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "只测试和打包，不发布"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Version and notes
+        id: meta
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          $v = (Select-String -Path app/__init__.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
+          $notes = "docs/release-notes/$v.md"
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
+          $build = (Select-String -Path app/__init__.py -Pattern '^BUILD = "(.*)"').Matches[0].Groups[1].Value
+          if ($env:DRY_RUN -ne "true") {
+            git rev-parse -q --verify "refs/tags/v$v" *> $null
+            if ($LASTEXITCODE -eq 0) { Write-Output "::error::v$v 已经发布过，先改 app/__init__.py 里的版本号"; exit 1 }
+            if (-not (Test-Path $notes)) { Write-Output "::error::先写发布说明 $notes"; exit 1 }
+            if ($build) { Write-Output "::error::正式版的 BUILD 要留空（现在是「$build」）"; exit 1 }
+          }
+          Write-Output "拾影 $v"
+          exit 0
+
+      - name: Test
+        run: |
+          python -m pip install -r requirements.txt pytest pyinstaller
+          python -m pytest tests -q
+
+      - name: Install the components for real
+        run: python tests/smoke_windows.py
+
+      - name: Build
+        run: |
+          python -m PyInstaller --noconfirm --clean --windowed --name ShiYing --icon assets\icon.ico --add-data "web;web" main.py
+          Compress-Archive -Path dist\ShiYing -DestinationPath ShiYing-windows-x64.zip
+          $sha = (Get-FileHash ShiYing-windows-x64.zip -Algorithm SHA256).Hash.ToLower()
+          Set-Content -Path ShiYing-windows-x64.zip.sha256 -Value $sha -NoNewline
+          Write-Output "SHA-256 $sha，$((Get-Item ShiYing-windows-x64.zip).Length) 字节"
+
+      # 像第一次打开一样启动打包好的 exe：安装向导应该自己弹出来，点「一键安装」后装完
+      - name: Open the built app once
+        continue-on-error: true
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "first-run"
+          $env:LOCALAPPDATA = Join-Path $root "local"
+          $env:APPDATA = Join-Path $root "roaming"
+          New-Item -ItemType Directory -Force $env:LOCALAPPDATA, $env:APPDATA | Out-Null
+          $env:SHIYING_SMOKE = Join-Path $root "result.json"
+          $p = Start-Process dist\ShiYing\ShiYing.exe -PassThru
+          if (-not $p.WaitForExit(900000)) { Stop-Process -Id $p.Id -Force; Write-Output "::warning::15 分钟内没有自己关掉" }
+          if (-not (Test-Path $env:SHIYING_SMOKE)) { Write-Output "::warning::没有生成结果文件"; exit 1 }
+          Get-Content $env:SHIYING_SMOKE -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ShiYing-windows-x64
+          path: ShiYing-windows-x64.zip
+
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          NOTES: ${{ steps.meta.outputs.notes }}
+        run: |
+          $sha = Get-Content ShiYing-windows-x64.zip.sha256 -Raw
+          $body = (Get-Content $env:NOTES -Raw -Encoding utf8).TrimEnd() + "`n`nSHA-256（ShiYing-windows-x64.zip）：``$sha``"
+          Set-Content -Path body.md -Value $body -Encoding utf8
+          gh release create $env:TAG ShiYing-windows-x64.zip --target $env:GITHUB_SHA --title "拾影 $env:VERSION" --notes-file body.md
