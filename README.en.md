@@ -43,7 +43,7 @@ Not supported: DRM-protected paid content (members-only films on iQIYI, Tencent 
 
 - Windows 10 or Windows 11, 64-bit
 - Microsoft Edge WebView2 Runtime: built into Windows 11, already present on almost every Windows 10 PC
-- Disk: ShiYing itself is under 30 MB; the components are about 260 MB to download; AI subtitles need another 0.2–1.3 GB (CPU engine + fast model at the low end, GPU engine + accurate model at the high end)
+- Disk: ShiYing itself is under 30 MB; the components are about 260 MB to download and take about 460 MB once unpacked; AI subtitles need another 0.2–1.3 GB download (CPU engine + fast model at the low end, GPU engine + accurate model at the high end), a bit more once unpacked
 
 ## Download
 

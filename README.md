@@ -64,7 +64,7 @@ A free, open-source **Windows GUI video downloader** for Douyin (no watermark), 
 
 - Windows 10 或 Windows 11，64 位
 - Edge WebView2 运行时：Windows 11 自带，Windows 10 绝大多数已经装了
-- 硬盘空间：拾影本身不到 30 MB；组件要下载约 260 MB，解压后占用更多一些（见下面「组件放在哪」）；AI 中文字幕另外需要 0.2～1.3 GB（CPU 版加快速模型最小，GPU 版加精准模型最大）
+- 硬盘空间：拾影本身不到 30 MB；下载组件要下约 260 MB，解压装好后占约 460 MB；AI 中文字幕另外要下 0.2～1.3 GB（CPU 版引擎加快速模型最少，GPU 版引擎加精准模型最多），解压后会再大一些
 
 ## 下载
 
