@@ -26,6 +26,9 @@ DEFAULTS = {
     "cookies": {p: {"mode": "none", "file": "", "browser": "firefox"} for p in PLATFORMS},
     "douyin_cookie": "",                # 抖音兜底：浏览器里复制的 Cookie 字符串
     "github_mirror": "",                # 组件下载加速前缀，例如 https://ghfast.top/
+    "auto_update_ytdlp": True,          # 启动时检查 yt-dlp 更新（网站改版后旧版会下不了）
+    "ytdlp_checked_at": 0,              # 上次检查的时间
+    "setup_skip": False,                # 第一次打开时的安装向导点过「以后再说」
     "watch_clipboard": True,            # 切回窗口时识别剪贴板里的链接
     "theme": "system",                  # system / dark / light
     # ---- 字幕 ----

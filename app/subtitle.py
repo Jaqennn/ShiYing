@@ -20,7 +20,7 @@ from pathlib import Path
 
 import requests
 
-from . import components
+from . import components, fetch
 from .netutil import NO_WINDOW, github_proxy, kill_tree, resolve_proxy
 from .paths import BIN_DIR, IS_WIN, LOCAL_DIR
 
@@ -111,20 +111,36 @@ def model_path(key):
 
 
 class Assets:
-    """识别引擎、模型、VAD 的下载状态（给设置页轮询）。"""
+    """识别引擎、模型、VAD 的下载状态（给设置页和安装向导轮询）。"""
 
     def __init__(self, settings):
         self.settings = settings
         self.state = {}
         self.lock = threading.Lock()
+        self._stops = {}
 
     def _set(self, key, **kw):
         with self.lock:
-            self.state.setdefault(key, {"status": "idle", "progress": 0.0, "message": ""}).update(kw)
+            self.state.setdefault(key, _idle()).update(kw)
 
     def _get(self, key):
         with self.lock:
-            return dict(self.state.get(key) or {"status": "idle", "progress": 0.0, "message": ""})
+            return dict(self.state.get(key) or _idle())
+
+    def get(self, key):
+        return self._get(key)
+
+    def _stop_event(self, key):
+        with self.lock:
+            ev = self._stops.setdefault(key, threading.Event())
+        ev.clear()
+        return ev
+
+    def stop(self, key):
+        with self.lock:
+            ev = self._stops.get(key)
+        if ev:
+            ev.set()
 
     def status(self):
         build = engine_build() if whisper_exe() else None
@@ -142,32 +158,17 @@ class Assets:
         }
 
     # ----- 下载 -----
-    def _stream(self, key, url, dest: Path, proxy, expect_min=100_000):
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        part = dest.with_name(dest.name + ".part")
-        s = requests.Session()
-        s.trust_env = False
-        if proxy:
-            s.proxies = {"http": proxy, "https": proxy}
-        with s.get(url, stream=True, timeout=30, headers={"User-Agent": "ShiYing"}) as r:
-            r.raise_for_status()
-            total = int(r.headers.get("Content-Length") or 0)
-            done, last = 0, 0.0
-            with open(part, "wb") as f:
-                for chunk in r.iter_content(512 * 1024):
-                    f.write(chunk)
-                    done += len(chunk)
-                    if time.time() - last > 0.3:
-                        last = time.time()
-                        mb = done / 1048576
-                        self._set(key, progress=(done / total) if total else 0.0,
-                                  message=f"{mb:.0f} / {total / 1048576:.0f} MB" if total else f"{mb:.0f} MB")
-        if done < expect_min:
-            part.unlink(missing_ok=True)
-            raise SubtitleError("下载的文件不完整")
-        part.replace(dest)
+    def _progress(self, key):
+        def on_bytes(done, total, speed):
+            mb = done / 1048576
+            msg = f"{mb:.0f} / {total / 1048576:.0f} MB" if total else f"{mb:.0f} MB"
+            if speed > 0:
+                msg += f"　{speed / 1048576:.1f} MB/s"
+            self._set(key, done=done, total=total, speed=speed,
+                      progress=(done / total) if total else 0.0, message=msg)
+        return on_bytes
 
-    def _hf_download(self, key, repo, filename, dest, expect_min):
+    def _hf_download(self, key, repo, filename, dest, expect_min, stop):
         src = self.settings.get("hf_source", "auto")
         order = {"official": ["official"], "mirror": ["mirror"]}.get(src, ["mirror", "official"])
         errors = []
@@ -176,8 +177,11 @@ class Assets:
             proxy = github_proxy(self.settings) if host == "official" else None
             try:
                 self._set(key, message="连接 " + ("hf-mirror.com" if host == "mirror" else "huggingface.co") + "…")
-                self._stream(key, url, dest, proxy, expect_min)
+                fetch.download(url, dest, proxy=proxy, stop=stop, on_bytes=self._progress(key),
+                               connections=4, expect_min=expect_min)
                 return
+            except fetch.Stopped:
+                raise
             except Exception as e:
                 errors.append(f"{host}: {e.__class__.__name__}")
         raise SubtitleError("模型下载失败（" + "；".join(errors) + "）。检查网络，或手动下载后放进模型文件夹")
@@ -187,32 +191,43 @@ class Assets:
             return False
         if self._get("model:" + key)["status"] == "working":
             return True
-        self._set("model:" + key, status="working", progress=0.0, message="准备下载…")
-
-        def run():
-            try:
-                self._hf_download("model:" + key, MODEL_REPO, MODELS[key]["file"], model_path(key), 10_000_000)
-                if not (MODELS_DIR / VAD["file"]).exists():   # 顺带装上静音检测模型（不到 1MB）
-                    try:
-                        self._hf_download("vad", VAD["repo"], VAD["file"], MODELS_DIR / VAD["file"], 100_000)
-                        self._set("vad", status="done", progress=1.0, message="")
-                    except Exception:
-                        pass
-                self._set("model:" + key, status="done", progress=1.0, message="已下载")
-            except Exception as e:
-                self._set("model:" + key, status="error", message=str(e)[:200])
-
-        threading.Thread(target=run, daemon=True).start()
+        self._set("model:" + key, **_idle(), status="working", message="准备下载…")
+        threading.Thread(target=self.install_model, args=(key,), daemon=True).start()
         return True
+
+    def install_model(self, key):
+        """下载一个识别模型（顺带装上不到 1MB 的静音检测模型），装好返回 True。"""
+        k = "model:" + key
+        stop = self._stop_event(k)
+        self._set(k, **_idle(), status="working", message="准备下载…")
+        try:
+            self._hf_download(k, MODEL_REPO, MODELS[key]["file"], model_path(key), 10_000_000, stop)
+            if not (MODELS_DIR / VAD["file"]).exists():
+                try:
+                    self._hf_download("vad", VAD["repo"], VAD["file"], MODELS_DIR / VAD["file"], 100_000, stop)
+                    self._set("vad", status="done", progress=1.0, message="")
+                except fetch.Stopped:
+                    raise
+                except Exception:
+                    pass
+            self._set(k, status="done", progress=1.0, speed=0, message="已下载")
+            return True
+        except fetch.Stopped:
+            self._set(k, **_idle(), message="已停止")
+            return False
+        except Exception as e:
+            self._set(k, status="error", speed=0, message=str(e)[:200])
+            return False
 
     def install_engine_async(self, gpu: bool):
         if self._get("engine")["status"] == "working":
             return True
-        self._set("engine", status="working", progress=0.0, message="查询最新版本…")
-        threading.Thread(target=self._install_engine, args=(gpu,), daemon=True).start()
+        self._set("engine", **_idle(), status="working", message="查询最新版本…")
+        threading.Thread(target=self.install_engine, args=(gpu,), daemon=True).start()
         return True
 
     def _pick_asset(self, gpu):
+        """返回 (文件名, 地址, 版本号, 官方 SHA-256 或 None)。"""
         proxy = github_proxy(self.settings)
         try:
             s = requests.Session()
@@ -220,67 +235,52 @@ class Assets:
             r = s.get(WHISPER_API, timeout=15, proxies={"http": proxy, "https": proxy} if proxy else None,
                       headers={"Accept": "application/vnd.github+json", "User-Agent": "ShiYing"})
             r.raise_for_status()
-            hit = pick_whisper_asset(r.json(), gpu)
+            releases = r.json()
+            hit = pick_whisper_asset(releases, gpu)
             if hit:
-                return hit
+                rel = next((x for x in releases if x.get("tag_name") == hit[2]), {})
+                return (*hit, fetch.digest_of(rel.get("assets"), hit[0]))
         except Exception:
             pass
-        return WHISPER_FALLBACK["gpu" if gpu else "cpu"]
+        return (*WHISPER_FALLBACK["gpu" if gpu else "cpu"], None)
 
-    def _install_engine(self, gpu):
+    def install_engine(self, gpu):
+        """装识别引擎（GPU 版 600 多 MB，CPU 版 20MB 左右），装好返回 True。"""
+        stop = self._stop_event("engine")
+        self._set("engine", **_idle(), status="working", message="查询最新版本…")
+        tmp = BIN_DIR / "whisper-download.zip"
         try:
             if not IS_WIN:
                 raise SubtitleError("自动安装只支持 Windows")
-            name, url, tag = self._pick_asset(gpu)
+            name, url, tag, digest = self._pick_asset(gpu)
             mirror = (self.settings["github_mirror"] or "").strip()
-            if mirror and url.startswith("https://github.com"):
-                url = mirror.rstrip("/") + "/" + url
+            url = fetch.with_mirror(url, mirror)
             self._set("engine", message=f"下载 {name}（{tag}）…")
             BIN_DIR.mkdir(parents=True, exist_ok=True)
-            tmp = BIN_DIR / "whisper-download.zip"
             proxy = None if mirror else github_proxy(self.settings)
-            self._download_big(url, tmp, proxy)
+            fetch.download(url, tmp, proxy=proxy, stop=stop, on_bytes=self._progress("engine"),
+                           connections=8, expect_min=1_000_000, digest=digest)
             self._set("engine", message="解压中…")
             install_whisper_zip(tmp, WHISPER_DIR, f"{name} {tag}".strip())
-            tmp.unlink(missing_ok=True)
-            self._set("engine", status="done", progress=1.0, message=("GPU 版" if gpu else "CPU 版") + "已安装")
+            self._set("engine", status="done", progress=1.0, speed=0, message=("GPU 版" if gpu else "CPU 版") + "已安装")
+            return True
+        except fetch.Stopped:
+            self._set("engine", **_idle(), message="已停止")
+            return False
         except Exception as e:
             msg = str(e)
             if isinstance(e, (requests.ConnectionError, requests.Timeout)):
-                msg = "连不上 GitHub：开代理，或在「组件」里填 GitHub 加速前缀"
+                msg = "连不上 GitHub：可以换加速镜像，或者开代理后再试"
             elif "404" in msg:
                 msg = "GitHub 上找不到安装包（whisper.cpp 可能又改了发布方式），请把这条提示发给开发者"
-            self._set("engine", status="error", message=msg[:200])
+            self._set("engine", status="error", speed=0, message=msg[:200])
+            return False
+        finally:
+            tmp.unlink(missing_ok=True)
 
-    def _download_big(self, url, dest, proxy):
-        """多连接下载大文件（GPU 版 600+MB），失败时退回单连接。"""
-        from . import fastdl
-        meter = fastdl.Meter()
-        last = [0.0]
-        total = [0]
 
-        def tick():
-            if time.time() - last[0] < 0.3:
-                return
-            last[0] = time.time()
-            sp = meter.speed()
-            t = total[0]
-            msg = f"{meter.done / 1048576:.0f} / {t / 1048576:.0f} MB" if t else f"{meter.done / 1048576:.0f} MB"
-            if sp > 0:
-                msg += f"　{sp / 1048576:.1f} MB/s"
-            self._set("engine", progress=(meter.done / t) if t else 0.0, message=msg)
-
-        try:
-            known = fastdl.probe(url, {"User-Agent": "ShiYing"}, proxy)
-            if known[0] and known[0] < 1_000_000:
-                raise SubtitleError("下载的文件不完整")
-            total[0] = known[0]
-            fastdl.download(url, dest, headers={"User-Agent": "ShiYing"}, proxy=proxy, connections=8,
-                            cancel=threading.Event(), on_progress=tick, meter=meter, known=known)
-        except fastdl.FastDLError as e:
-            if "HTTP 404" in str(e):
-                raise SubtitleError("404")
-            self._stream("engine", url, dest, proxy, 1_000_000)
+def _idle():
+    return {"status": "idle", "progress": 0.0, "message": "", "done": 0, "total": 0, "speed": 0}
 
 
 def install_whisper_zip(zip_path: Path, target: Path, build: str):

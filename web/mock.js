@@ -38,7 +38,7 @@
   ];
   setInterval(() => {
     const t = tasks[0];
-    if (t.status !== "downloading") return;
+    if (!t || t.status !== "downloading") return;
     t.progress = Math.min(1, t.progress + 0.01);
     t.downloaded = t.total * t.progress;
     t.eta = Math.max(0, Math.round((1 - t.progress) * 65));
@@ -58,8 +58,69 @@
     default_quality: "1080",
   };
 
+  // 演示场景：index.html?demo=setup（第一次打开）/ installing（正在装）/ empty（空列表）
+  const demo = new URLSearchParams(location.search).get("demo") || "";
+  if (demo === "empty" || demo === "setup" || demo === "installing") tasks.length = 0;
+  const MB = 1048576;
+  const plan = {
+    items: [
+      { key: "yt-dlp", group: "download", label: "yt-dlp", desc: "下载引擎：YouTube、哔哩哔哩、X 和上千个网站都靠它", size: 23.6e6, installed: false },
+      { key: "ffmpeg", group: "download", label: "ffmpeg", desc: "把画面和声音合成一个文件，也负责转音频", size: 150e6, installed: false },
+      { key: "deno", group: "download", label: "deno", desc: "YouTube 必需，用来解开视频地址", size: 45e6, installed: false },
+      { key: "engine", group: "subtitle", label: "识别引擎", desc: "GPU 版：检测到 NVIDIA 显卡，识别快很多", size: 685e6, installed: false, gpu: true },
+      { key: "model:base.en", group: "model", label: "快速", desc: "英文专用，速度最快，准确度一般", size: 148e6, installed: false },
+      { key: "model:small.en", group: "model", label: "均衡", desc: "英文专用，速度和准确度兼顾", size: 488e6, installed: false },
+      { key: "model:large-v3-turbo", group: "model", label: "精准", desc: "最准，支持多种语言；没有 NVIDIA 显卡时较慢", size: 574e6, installed: false, recommended: true },
+    ],
+    gpu: true, recommended_model: "model:large-v3-turbo", missing: ["yt-dlp", "ffmpeg", "deno"],
+    location: "C:\\Users\\you\\AppData\\Local\\ShiYing", mirror: "", default_mirror: "https://ghfast.top/",
+  };
+  let job = null;
+  const labelOf = (k) => (k === "engine" ? "识别引擎（GPU 版）" : k.startsWith("model:") ? "识别模型 · " + plan.items.find((i) => i.key === k).label : k);
+  function startJob(keys, at = 0) {
+    job = { status: "working", mirror: "", items: keys.map((k) => ({ key: k, label: labelOf(k), size: plan.items.find((i) => i.key === k).size, status: "waiting", done: 0, total: 0, message: "" })) };
+    job.items.forEach((it, i) => { if (i < at) Object.assign(it, { status: "done", done: it.size, total: it.size, message: "已安装" }); });
+  }
+  if (demo === "installing") { startJob(["yt-dlp", "ffmpeg", "deno"], 1); job.items[1].done = 52.4e6; job.items[1].total = 150e6; }
+  function jobView() {
+    if (!job) return { status: "idle", items: [], done: 0, total: 0, speed: 0, eta: null, current: null, index: 0, count: 0, slow: false };
+    const cur = job.items.findIndex((it) => it.status === "working" || it.status === "waiting");
+    if (job.status === "working" && cur >= 0) {
+      const it = job.items[cur];
+      it.status = "working";
+      it.total = it.size;
+      it.done = Math.min(it.size, it.done + 3.4 * MB * 0.5 * (demo === "installing" ? 0 : 1));
+      it.message = `${(it.done / MB).toFixed(1)} / ${(it.size / MB).toFixed(1)} MB`;
+      if (it.done >= it.size) { it.status = "done"; it.message = "已安装"; }
+    }
+    if (job.status === "working" && job.items.every((it) => it.status === "done")) job.status = "done";
+    const total = job.items.reduce((n, it) => n + it.size, 0), done = job.items.reduce((n, it) => n + it.done, 0);
+    const c = job.items.findIndex((it) => it.status === "working");
+    return { ...job, items: job.items.map((it) => ({ ...it })), done, total, speed: c >= 0 ? 3.4 * MB : 0,
+      eta: c >= 0 ? (total - done) / (3.4 * MB) : null, current: c >= 0 ? job.items[c].key : null, index: c + 1, count: job.items.length,
+      slow: demo === "installing" };
+  }
+
   window.ShiYingMock = {
-    app_info: () => ok({ name: "拾影", version: "0.1.0 (演示)", data_dir: "C:\\Users\\you\\AppData\\Roaming\\ShiYing", missing: ["deno"] }),
+    app_info: () => ok({ name: "拾影", version: "0.5.0 (演示)", data_dir: "C:\\Users\\you\\AppData\\Roaming\\ShiYing",
+      missing: demo === "setup" || demo === "installing" ? ["yt-dlp", "ffmpeg", "deno"] : [], setup_skip: false, setup: jobView() }),
+    setup_plan: () => ok({ ...JSON.parse(JSON.stringify(plan)), job: jobView() }),
+    setup_start: (keys) => { startJob(keys); return ok(jobView()); },
+    setup_status: () => ok(jobView()),
+    setup_stop: () => { if (job) { job.status = "stopped"; job.items.forEach((it) => { if (it.status === "working") it.status = "stopped"; }); } return ok(jobView()); },
+    setup_retry: () => { if (job) { job.status = "working"; job.items.forEach((it) => { if (it.status !== "done") it.status = "waiting"; }); } return ok(jobView()); },
+    setup_use_mirror: () => { if (job) job.mirror = "https://ghfast.top/"; return ok(jobView()); },
+    setup_later: () => ok(true),
+    feedback_info: (extra) => {
+      const items = [["拾影", "0.5.0"], ["系统", "Windows 11 专业版 24H2（26100.2314），64 位"], ["yt-dlp", "2026.10.22"], ["ffmpeg", "N-121580-g2a7b"],
+        ["deno", "2.5.6"], ["字幕引擎", "GPU 版（whisper-bin-win-cuda-12.4.0-x64.zip b5454）"], ["识别模型", "精准"], ["显卡", "检测到 NVIDIA"], ["WebView2", "142.0.3595.53"]]
+        .map(([label, value]) => ({ label, value }));
+      const task = extra ? [["出错的网站", extra.site], ["视频标题", extra.title], ["错误提示", extra.error], ["视频链接", extra.url]]
+        .filter(([, v]) => v).map(([label, value]) => ({ label, value })) : [];
+      return ok({ items, task, text: [...items, ...task].map((r) => r.label + "：" + r.value).join("\n"), survey_url: "",
+        issue_url: "https://github.com/Jaqennn/ShiYing/issues/new?template=bug.yml", repo: "https://github.com/Jaqennn/ShiYing" });
+    },
+    open_url: () => ok(true),
     detect: (t) => ok(/youtu/.test(t) ? { platform: "youtube", url: t } : /weixin/.test(t) ? { platform: "wechat", url: t } : /douyin/.test(t) ? { platform: "douyin", url: t } : /b23|bilibili/.test(t) ? { platform: "bilibili", url: t } : { platform: "other", url: t }),
     clipboard: () => ok(""),
     detect_all: (t) => ok((t.match(/https?:\/\/\S+/g) || []).map((u) => ({ url: u, platform: /youtu/.test(u) ? "youtube" : /weixin/.test(u) ? "wechat" : /douyin/.test(u) ? "douyin" : /b23|bilibili/.test(u) ? "bilibili" : /x\.com/.test(u) ? "x" : "other" }))),

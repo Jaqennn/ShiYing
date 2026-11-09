@@ -2,15 +2,19 @@
 import functools
 import os
 import sys
+import threading
+import time
 import traceback
+import webbrowser
 from pathlib import Path
 
-from . import APP_NAME, BUILD, __version__, detect
+from . import APP_NAME, BUILD, __version__, detect, feedback
 from .components import ComponentManager
 from .netutil import open_file, read_clipboard, reveal, system_proxy
 from .paths import BIN_DIR, DATA_DIR
 from .settings import Settings
-from .tasks import TaskManager
+from .setup import SetupManager
+from .tasks import ACTIVE, TaskManager
 from . import subtitle
 
 
@@ -44,6 +48,13 @@ class Api:
         self._assets = subtitle.Assets(self._settings)
         self._subs = subtitle.SubtitleManager(self._settings, self._tasks)
         self._tasks.on_done = self._subs.enqueue
+        self._setup = SetupManager(self._settings, self._comps, self._assets)
+        threading.Thread(target=self._auto_update, daemon=True).start()
+
+    def _auto_update(self):
+        time.sleep(8)   # 等窗口先打开
+        busy = lambda: any(t["status"] in ACTIVE for t in self._tasks.list())  # noqa: E731
+        self._comps.auto_update_ytdlp(busy)
 
     def bind(self, window):
         self._window = window
@@ -53,7 +64,8 @@ class Api:
     def app_info(self):
         return {"name": APP_NAME, "version": __version__, "build": BUILD, "data_dir": str(DATA_DIR),
                 "bin_dir": str(BIN_DIR), "platform": sys.platform,
-                "missing": self._comps.missing()}
+                "missing": self._comps.missing(), "setup_skip": bool(self._settings.get("setup_skip")),
+                "setup": self._setup.status()}
 
     @api
     def detect(self, text):
@@ -222,4 +234,46 @@ class Api:
     def open_bin_dir(self):
         BIN_DIR.mkdir(parents=True, exist_ok=True)
         reveal(str(BIN_DIR))
+        return True
+
+    # ---------- 安装向导 ----------
+    @api
+    def setup_plan(self):
+        return self._setup.plan()
+
+    @api
+    def setup_start(self, keys):
+        return self._setup.start(keys or [])
+
+    @api
+    def setup_status(self):
+        return self._setup.status()
+
+    @api
+    def setup_stop(self):
+        return self._setup.stop()
+
+    @api
+    def setup_retry(self):
+        return self._setup.retry()
+
+    @api
+    def setup_use_mirror(self, prefix=None):
+        return self._setup.use_mirror(prefix)
+
+    @api
+    def setup_later(self):
+        self._settings.update({"setup_skip": True})
+        return True
+
+    # ---------- 反馈 ----------
+    @api
+    def feedback_info(self, extra=None):
+        return feedback.collect(self._comps.status(), self._assets.status(), extra)
+
+    @api
+    def open_url(self, url):
+        if not feedback.allowed_url(url):
+            raise ValueError("不能打开这个地址")
+        webbrowser.open(url)
         return True

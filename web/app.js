@@ -74,6 +74,7 @@ const state = {
   tasks: [],
   lastClip: "",
   parsing: false,
+  advOpen: false,
 };
 
 /* ---------- 解析 ---------- */
@@ -475,6 +476,17 @@ function rowSub(t) {
 
 const SUB_RUNNING = ["queued", "fetching", "extracting", "recognizing", "translating", "writing"];
 
+// 专门做过优化的平台，按使用人数从多到少排（国内按 QuestMobile 2026 年 6 月月活）
+const SUPPORTED = [
+  ["国内", [["wechat", "微信公众号"], ["douyin", "抖音"], ["bilibili", "哔哩哔哩"]]],
+  ["海外", [["youtube", "YouTube"], ["x", "X"]]],
+];
+function platformChips() {
+  return `<div class="plats">${SUPPORTED.map(([k, ps]) =>
+    `<div class="plat-row"><span class="plat-k">${k}</span>${ps.map(([id, name]) => `<span class="tag ${id}">${name}</span>`).join("")}</div>`).join("")}
+    <p class="plat-more">还可以试小红书、微博、Vimeo、Twitch 等上千个网站</p></div>`;
+}
+
 function subLine(t, fallback) {
   const st = t.sub_status;
   if (SUB_RUNNING.includes(st)) return `<span class="sub-run">字幕：${esc(t.sub_msg || "处理中")}</span>`;
@@ -497,6 +509,8 @@ function rowActions(t) {
     if (st === "error") return play + `<button data-a="sub">重试字幕</button>` + folder + rm;
     return play + `<button data-a="sub">生成字幕</button>` + folder + rm;
   }
+  if (t.status === "error")
+    return `<button class="primary" data-a="retry">重试</button><button data-a="feedback">反馈</button><button data-a="remove">移除</button>`;
   return `<button class="primary" data-a="retry">重试</button><button data-a="remove">移除</button>`;
 }
 
@@ -554,7 +568,8 @@ function renderRows() {
     empty.innerHTML = `<p>这里还没有${{ active: "进行中的", done: "已完成的", failed: "失败的" }[state.filter] || ""}任务</p>`;
   } else if (!list.length) {
     empty.innerHTML = `<p class="empty-title">复制一个视频链接，回到这里</p>
-      <p>窗口会自动认出剪贴板里的链接。支持 YouTube、哔哩哔哩、X、抖音、微信公众号，以及 Vimeo、TED、Twitch、Reddit 等上千个网站。</p>`;
+      <p>窗口会自动认出剪贴板里的链接，也可以直接粘贴到上面。</p>
+      ${platformChips()}`;
   }
 }
 
@@ -571,6 +586,11 @@ rowsEl.addEventListener("click", async (e) => {
     if (a === "sub") await call("subtitle", id);
     if (a === "sub-cancel") await call("cancel_subtitle", id);
     if (a === "sub-reveal") await call("reveal_subtitle", id);
+    if (a === "feedback") {
+      const t = state.tasks.find((x) => x.id === id) || {};
+      openFeedback({ site: (t.platform === "other" && t.site) || PLAT[t.platform] || "", title: t.title, error: t.error, url: t.url });
+      return;
+    }
     if (a === "retry") {
       try { await call("retry", id); }
       catch (err) {
@@ -611,22 +631,38 @@ async function poll(now) {
 }
 
 /* ---------- 组件提示 ---------- */
+let bannerTimer;
 async function refreshBanner() {
+  clearTimeout(bannerTimer);
   const info = await call("app_info").catch(() => null);
   const b = $("#setupBanner");
-  if (!info || !info.missing.length) { b.hidden = true; return; }
-  const names = info.missing.join("、");
-  b.innerHTML = `<span>还缺 ${esc(names)}，YouTube / 哔哩哔哩 / X 暂时下不了（抖音、公众号不受影响）</span>
-    <button class="text" id="bannerGo">去安装</button>`;
+  if (!info) { b.hidden = true; return; }
+  const job = info.setup || {};
+  if (job.status === "working") {
+    const pct = job.total ? Math.floor((job.done / job.total) * 100) : 0;
+    const cur = (job.items || []).find((it) => it.key === job.current);
+    b.className = "banner busy-line";
+    b.innerHTML = `<span>正在后台安装组件 ${pct}%${cur ? "（" + esc(cur.label) + "）" : ""}</span><button class="text" id="bannerGo">查看</button>`;
+    b.hidden = false;
+    $("#bannerGo").onclick = () => openSetup(false);
+    bannerTimer = setTimeout(refreshBanner, 1500);
+    return;
+  }
+  if (!info.missing.length) { b.hidden = true; return; }
+  b.className = "banner";
+  b.innerHTML = `<span>还缺 ${esc(info.missing.join("、"))}，YouTube、哔哩哔哩、X 暂时下不了（抖音、公众号不受影响）</span>
+    <button class="text" id="bannerGo">一键安装</button>`;
   b.hidden = false;
-  $("#bannerGo").onclick = () => openDrawer("components");
+  $("#bannerGo").onclick = () => openSetup(false);
 }
 
 /* ---------- 设置 ---------- */
 const QUALITY_OPTS = [["best", "最高画质"], ["2160", "4K"], ["1440", "2K"], ["1080", "1080P"], ["720", "720P"], ["480", "480P"], ["audio_m4a", "仅音频 M4A"]];
 const COOKIE_PLATS = ["youtube", "bilibili", "x", "douyin", "other"];
 
+const ADVANCED = ["download-more", "format", "network", "cookies", "comp-net"];
 function openDrawer(focus) {
+  if (focus && ADVANCED.includes(focus)) state.advOpen = true;
   $("#app").classList.add("drawer-open");
   $("#drawer").setAttribute("aria-hidden", "false");
   renderSettings();
@@ -675,21 +711,6 @@ function renderSettings() {
     <div class="field"><span>默认清晰度</span>
       <select data-k="default_quality">${QUALITY_OPTS.map(([v, l]) => `<option value="${v}" ${v === s.default_quality ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     <div class="field"><span>同时下载</span>${seg("max_concurrent", s.max_concurrent, [[1, "1 个"], [2, "2 个"], [3, "3 个"], [4, "4 个"]])}</div>
-    <div class="field"><label>文件名</label><input class="input" data-k="filename_template" value="${esc(s.filename_template)}">
-      <small>yt-dlp 模板写法。默认：标题前 60 字 + [视频ID]</small></div>
-    <div class="switch-row"><div>多线程加速<small>像 IDM 一样把文件切块、多个连接同时下。遇到不支持的视频会自动换回普通方式</small></div>
-      <input type="checkbox" class="switch" data-k="accelerate" ${s.accelerate ? "checked" : ""}></div>
-    ${s.accelerate ? `<div class="field"><span>每个文件连接数</span>${seg("connections", s.connections, [[4, "4"], [8, "8"], [16, "16"], [32, "32"]])}</div>
-    <div class="field"><span></span><small style="margin:0">一般 16 就够；个别网站连接太多会被限速或报错，可以调小</small></div>` : ""}
-    <div class="switch-row"><div>按平台分文件夹<small>YouTube、Bilibili、X、Douyin、WeChat 各放一个子文件夹</small></div>
-      <input type="checkbox" class="switch" data-k="split_by_platform" ${s.split_by_platform ? "checked" : ""}></div>
-  </section>
-
-  <section class="group" id="g-format">
-    <h3>格式</h3>
-    <div class="switch-row"><div>兼容优先<small>同等清晰度下优先 H.264 + AAC，Windows 自带播放器、手机、剪辑软件都能直接用。关掉则优先 AV1/VP9，体积更小但老电脑可能放不了</small></div>
-      <input type="checkbox" class="switch" data-k="compat_mode" ${s.compat_mode ? "checked" : ""}></div>
-    <div class="field"><span>封装格式</span>${seg("container", s.container, [["mp4", "MP4"], ["mkv", "MKV"]])}</div>
   </section>
 
   <section class="group" id="g-subtitle">
@@ -718,6 +739,49 @@ function renderSettings() {
       <input type="checkbox" class="switch" data-k="sub_vad" ${s.sub_vad ? "checked" : ""}></div>
   </section>
 
+  <section class="group" id="g-components">
+    <h3>组件</h3>
+    <div id="compList"><p class="about">读取中…</p></div>
+    <div class="comp-tools"><button class="mini" id="openSetupBtn">打开安装向导</button>
+      <small>缺什么一键装好；组件装在固定位置，换新版本不用重装</small></div>
+  </section>
+
+  <section class="group" id="g-look">
+    <h3>外观</h3>
+    <div class="field"><span>颜色</span>${seg("theme", s.theme, [["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]])}</div>
+  </section>
+
+  <section class="group" id="g-about">
+    <h3>反馈与关于</h3>
+    <div class="switch-row"><div>下载不了、报错，或者想支持新网站<small>反馈页会自动带上系统和组件版本，一键复制</small></div>
+      <button class="mini" id="openFeedbackBtn">反馈问题</button></div>
+    <p class="about" id="aboutLine"></p>
+  </section>
+
+  <details class="adv" id="g-advanced" ${state.advOpen ? "open" : ""}>
+    <summary>高级设置<small>文件名、多线程、格式、代理、登录信息、组件下载</small></summary>
+
+  <section class="group" id="g-download-more">
+    <h3>下载细节</h3>
+    <div class="field"><label>文件名</label><input class="input" data-k="filename_template" value="${esc(s.filename_template)}">
+      <small>yt-dlp 模板写法。默认：标题前 60 字 + [视频ID]</small></div>
+    <div class="switch-row"><div>多线程加速<small>像 IDM 一样把文件切块、多个连接同时下。遇到不支持的视频会自动换回普通方式</small></div>
+      <input type="checkbox" class="switch" data-k="accelerate" ${s.accelerate ? "checked" : ""}></div>
+    ${s.accelerate ? `<div class="field"><span>每个文件连接数</span>${seg("connections", s.connections, [[4, "4"], [8, "8"], [16, "16"], [32, "32"]])}</div>
+    <div class="field"><span></span><small style="margin:0">一般 16 就够；个别网站连接太多会被限速或报错，可以调小</small></div>` : ""}
+    <div class="switch-row"><div>按平台分文件夹<small>YouTube、Bilibili、X、Douyin、WeChat 各放一个子文件夹</small></div>
+      <input type="checkbox" class="switch" data-k="split_by_platform" ${s.split_by_platform ? "checked" : ""}></div>
+    <div class="switch-row"><div>识别剪贴板<small>切回窗口时，如果剪贴板里有支持的链接就提示一键解析</small></div>
+      <input type="checkbox" class="switch" data-k="watch_clipboard" ${s.watch_clipboard ? "checked" : ""}></div>
+  </section>
+
+  <section class="group" id="g-format">
+    <h3>格式</h3>
+    <div class="switch-row"><div>兼容优先<small>同等清晰度下优先 H.264 + AAC，Windows 自带播放器、手机、剪辑软件都能直接用。关掉则优先 AV1/VP9，体积更小但老电脑可能放不了</small></div>
+      <input type="checkbox" class="switch" data-k="compat_mode" ${s.compat_mode ? "checked" : ""}></div>
+    <div class="field"><span>封装格式</span>${seg("container", s.container, [["mp4", "MP4"], ["mkv", "MKV"]])}</div>
+  </section>
+
   <section class="group" id="g-network">
     <h3>网络与代理</h3>
     <div class="field"><span>代理</span>${seg("proxy_mode", s.proxy_mode, [["system", "跟随系统"], ["manual", "手动"], ["none", "不使用"]])}</div>
@@ -735,21 +799,15 @@ function renderSettings() {
       <textarea data-k="douyin_cookie" placeholder="一般不需要。解析失败时，在浏览器登录 douyin.com，F12 → 网络 → 任意请求的 Cookie 整串粘贴到这里">${esc(s.douyin_cookie)}</textarea></div>
   </section>
 
-  <section class="group" id="g-components">
-    <h3>组件</h3>
-    <div id="compList"><p class="about">读取中…</p></div>
-    <div class="field" style="margin-top:12px"><label>GitHub 加速</label>
+  <section class="group" id="g-comp-net">
+    <h3>组件下载</h3>
+    <div class="field"><label>GitHub 加速</label>
       <input class="input" data-k="github_mirror" value="${esc(s.github_mirror)}" placeholder="可选，例如 https://ghfast.top/"></div>
-    <div class="field"><span></span><small style="margin:0">组件从 GitHub 下载。没开代理又下不动时填一个加速前缀；也可以手动把 exe 放进 <button class="text" id="openBin">bin 文件夹</button></small></div>
+    <div class="field"><span></span><small style="margin:0">组件从 GitHub 下载。没开代理又下不动时填一个加速前缀；镜像是第三方提供的，下完会和官方校验值核对。也可以手动把 exe 放进 <button class="text" id="openBin">bin 文件夹</button></small></div>
+    <div class="switch-row"><div>自动更新 yt-dlp<small>网站改版后旧版会下不了。打开拾影时悄悄检查，两天最多一次</small></div>
+      <input type="checkbox" class="switch" data-k="auto_update_ytdlp" ${s.auto_update_ytdlp !== false ? "checked" : ""}></div>
   </section>
-
-  <section class="group">
-    <h3>其他</h3>
-    <div class="switch-row"><div>识别剪贴板<small>切回窗口时，如果剪贴板里有支持的链接就提示一键解析</small></div>
-      <input type="checkbox" class="switch" data-k="watch_clipboard" ${s.watch_clipboard ? "checked" : ""}></div>
-    <div class="field"><span>外观</span>${seg("theme", s.theme, [["system", "跟随系统"], ["light", "浅色"], ["dark", "深色"]])}</div>
-    <p class="about" id="aboutLine"></p>
-  </section>`;
+  </details>`;
 
   call("app_info").then((i) => {
     $("#aboutLine").innerHTML = `拾影 ${esc(i.version)}${i.build ? " " + esc(i.build) : ""}　配置目录 ${esc(i.data_dir)}<br>仅供个人学习备份使用，请尊重创作者版权。`;
@@ -784,6 +842,9 @@ async function save(path, val, rerender) {
   if (rerender) { const y = $("#settingsBody").scrollTop; renderSettings(); loadComponents(); loadSubAssets(); $("#settingsBody").scrollTop = y; }
 }
 
+$("#settingsBody").addEventListener("toggle", (e) => {
+  if (e.target.id === "g-advanced") state.advOpen = e.target.open;
+}, true);
 $("#settingsBody").addEventListener("input", (e) => {
   const el = e.target;
   if (!el.dataset.k || el.type === "checkbox" || el.tagName === "SELECT") return;
@@ -817,6 +878,8 @@ $("#settingsBody").addEventListener("click", async (e) => {
     return;
   }
   if (e.target.closest("#openBin")) { call("open_bin_dir").catch(() => {}); return; }
+  if (e.target.closest("#openSetupBtn")) { closeDrawer(); openSetup(false); return; }
+  if (e.target.closest("#openFeedbackBtn")) { closeDrawer(); openFeedback(); return; }
   if (e.target.closest("#openModels")) { call("open_models_dir").catch(() => {}); return; }
   const wb = e.target.closest("[data-whisper]");
   if (wb) { await call("install_whisper", wb.dataset.whisper === "gpu").catch((err) => toast(err.message)); loadSubAssets(); return; }
@@ -914,6 +977,231 @@ function applyTheme() {
   else document.documentElement.setAttribute("data-theme", t);
 }
 
+/* ---------- 弹窗 ---------- */
+function openModal(id) { $("#" + id).hidden = false; document.body.classList.add("modal-open"); }
+function closeModal(id) {
+  $("#" + id).hidden = true;
+  if (!document.querySelector(".modal:not([hidden])")) document.body.classList.remove("modal-open");
+}
+document.addEventListener("click", (e) => {
+  const c = e.target.closest("[data-close]");
+  if (c) { if (c.dataset.close === "setup") closeSetup(); else closeModal(c.dataset.close + "Modal"); return; }
+  if (e.target.classList.contains("modal")) {
+    if (e.target.id === "setupModal") closeSetup(); else closeModal(e.target.id);
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!$("#feedbackModal").hidden) closeModal("feedbackModal");
+  else if (!$("#setupModal").hidden) closeSetup();
+});
+
+/* ---------- 安装向导 ---------- */
+const setupUI = { plan: null, sel: new Set(), subs: false, model: null, timer: null, auto: false };
+const GROUP_TITLES = { download: ["下载视频", "必装"], subtitle: ["AI 中文字幕", "可选"] };
+
+async function openSetup(auto) {
+  setupUI.auto = !!auto;
+  openModal("setupModal");
+  $("#setupTitle").textContent = "装好组件就能开始下载";
+  $("#setupBody").innerHTML = `<p class="about">读取中…</p>`;
+  $("#setupFoot").innerHTML = "";
+  let p;
+  try { p = await call("setup_plan"); } catch (e) { toast(e.message); closeSetup(); return; }
+  setupUI.plan = p;
+  if (p.job && ["working", "error", "stopped"].includes(p.job.status)) { showSetupJob(p.job); return; }
+  setupUI.sel = new Set(p.items.filter((it) => it.group === "download" && !it.installed).map((it) => it.key));
+  const installedModel = p.items.find((it) => it.group === "model" && it.installed);
+  setupUI.model = installedModel ? installedModel.key : p.recommended_model;
+  setupUI.subs = false;
+  renderSetupChoose();
+}
+
+function closeSetup() {
+  clearTimeout(setupUI.timer);
+  closeModal("setupModal");
+  refreshBanner();
+}
+
+function setupKeys() {
+  const p = setupUI.plan;
+  const keys = [...setupUI.sel];
+  if (setupUI.subs) {
+    const eng = p.items.find((it) => it.key === "engine");
+    if (eng && !eng.installed) keys.push("engine");
+    const m = p.items.find((it) => it.key === setupUI.model);
+    if (m && !m.installed) keys.push(m.key);
+  }
+  return keys;
+}
+
+function setupItem(it, input, right) {
+  return `<label class="setup-item ${it.installed ? "is-done" : ""}">${input}
+    <span class="si-name">${esc(it.label)}${it.recommended ? `<em class="rec">推荐</em>` : ""}</span>
+    <span class="si-desc">${esc(it.desc)}</span>
+    <span class="si-right">${right}</span></label>`;
+}
+
+function renderSetupChoose() {
+  const p = setupUI.plan;
+  const dl = p.items.filter((it) => it.group === "download");
+  const eng = p.items.find((it) => it.key === "engine");
+  const models = p.items.filter((it) => it.group === "model");
+  const sizeOf = (it) => (it.installed ? `<span class="ok">已装好</span>` : `约 ${fmtBytes(it.size)}`);
+  const dlRows = dl.map((it) => setupItem(it,
+    `<input type="checkbox" data-sk="${it.key}" ${it.installed ? "checked disabled" : setupUI.sel.has(it.key) ? "checked" : ""}>`, sizeOf(it))).join("");
+  const modelRows = models.map((it) => setupItem(it,
+    `<input type="radio" name="setupModel" data-sm="${it.key}" ${setupUI.model === it.key ? "checked" : ""}>`, sizeOf(it))).join("");
+  const keys = setupKeys();
+  const total = keys.reduce((n, k) => n + ((p.items.find((it) => it.key === k) || {}).size || 0), 0);
+  const allDone = dl.every((it) => it.installed);
+  $("#setupTitle").textContent = allDone ? "下载组件都装好了" : "装好组件就能开始下载";
+  $("#setupBody").innerHTML = `
+    <p class="setup-lead">抖音、微信公众号不用装组件也能下。YouTube、哔哩哔哩、X 等网站要先装下面的下载组件。</p>
+    <section class="setup-group"><h3>${GROUP_TITLES.download[0]}<em>${GROUP_TITLES.download[1]}</em></h3>${dlRows}</section>
+    <section class="setup-group"><h3>${GROUP_TITLES.subtitle[0]}<em>${GROUP_TITLES.subtitle[1]}</em></h3>
+      <label class="setup-item"><input type="checkbox" id="setupSubs" ${setupUI.subs ? "checked" : ""}>
+        <span class="si-name">给英文视频生成中文字幕</span>
+        <span class="si-desc">在你电脑上识别语音，不上传视频；翻译要在设置里填 DeepL 或大模型密钥</span>
+        <span class="si-right"></span></label>
+      ${setupUI.subs ? `<div class="setup-sub">${setupItem(eng, `<input type="checkbox" checked disabled>`, sizeOf(eng))}
+        <p class="setup-k">识别模型（选一个）</p>${modelRows}</div>` : ""}
+    </section>
+    <p class="setup-sum">${keys.length ? `一共要下载约 <b>${fmtBytes(total)}</b>。` : allDone ? "下载需要的组件都已经装好了。" : "勾选要装的组件。"}
+      组件装在 <code>${esc(p.location)}</code>，以后换新版本不用重装。</p>`;
+  $("#setupFoot").innerHTML = `
+    <button class="ghost" id="setupLater">${setupUI.auto ? "以后再说" : "关闭"}</button>
+    <button class="seal-btn" id="setupGo" ${keys.length ? "" : "disabled"}>${keys.length ? "一键安装" : "没有要装的"}</button>`;
+}
+
+$("#setupModal").addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.dataset.sk) { if (el.checked) setupUI.sel.add(el.dataset.sk); else setupUI.sel.delete(el.dataset.sk); renderSetupChoose(); }
+  else if (el.id === "setupSubs") { setupUI.subs = el.checked; renderSetupChoose(); }
+  else if (el.dataset.sm) { setupUI.model = el.dataset.sm; renderSetupChoose(); }
+});
+
+$("#setupModal").addEventListener("click", async (e) => {
+  const id = (e.target.closest("button") || {}).id;
+  if (!id) return;
+  try {
+    if (id === "setupLater") {
+      if (setupUI.auto) await call("setup_later");
+      closeSetup();
+    } else if (id === "setupGo") {
+      showSetupJob(await call("setup_start", setupKeys()));
+    } else if (id === "setupStop") {
+      showSetupJob(await call("setup_stop"));
+    } else if (id === "setupRetry") {
+      showSetupJob(await call("setup_retry"));
+    } else if (id === "setupMirror") {
+      const st = await call("setup_use_mirror", null);
+      toast("已换成加速镜像，正在重新下载");
+      showSetupJob(st.status === "working" ? st : await call("setup_retry"));
+    } else if (id === "setupBg") {
+      closeSetup();
+      toast("在后台继续安装，顶上会显示进度");
+    } else if (id === "setupDone") {
+      closeSetup();
+      state.settings = await call("get_settings");
+    }
+  } catch (err) { toast(err.message); }
+});
+
+function showSetupJob(job) {
+  clearTimeout(setupUI.timer);
+  const items = job.items || [];
+  const cur = items.find((it) => it.key === job.current);
+  const pct = job.total ? Math.min(1, job.done / job.total) : 0;
+  const failed = items.filter((it) => it.status === "error");
+  const title = { working: "正在安装组件", done: "全部装好了", error: `有 ${failed.length} 项没装上`, stopped: "已停止安装" }[job.status] || "安装组件";
+  $("#setupTitle").textContent = title;
+  const meta = [];
+  if (job.total) meta.push(`${fmtBytes(job.done)} / ${fmtBytes(job.total)}`);
+  if (job.status === "working" && job.speed) meta.push(`${fmtBytes(job.speed)}/s`);
+  if (job.status === "working" && job.eta != null) meta.push(fmtEta(job.eta));
+  const line = job.status === "working" && cur ? `正在装 <b>${esc(cur.label)}</b>（第 ${job.index} 项，共 ${job.count} 项）`
+    : job.status === "done" ? "可以开始下载了：复制一个视频链接，回到拾影就会自动认出来。"
+    : job.status === "stopped" ? "装到一半停下了，点「继续安装」会接着装没装完的。"
+    : "下面写了没装上的原因。常见的是连不上 GitHub：换加速镜像，或者开代理后再试。";
+  const rows = items.map((it) => {
+    const p = it.total ? it.done / it.total : it.progress || 0;
+    const right = it.status === "done" ? `<span class="ok">已装好</span>`
+      : it.status === "working" ? esc(it.message || "下载中…")
+      : it.status === "error" ? `<span class="err-text">${esc(it.message || "没装上")}</span>`
+      : it.status === "stopped" ? "已停止" : "等待";
+    return `<li class="${it.status}"><span class="sl-name">${esc(it.label)}</span><span class="sl-right">${right}</span>
+      ${it.status === "working" ? `<i class="sl-bar" style="--p:${p}"></i>` : ""}</li>`;
+  }).join("");
+  const canMirror = !job.mirror;
+  const slow = job.status === "working" && job.slow && canMirror
+    ? `<div class="setup-slow">下载有点慢？<button class="text" id="setupMirror">换加速镜像</button><small>镜像是第三方提供的，下完会和官方校验值核对</small></div>` : "";
+  $("#setupBody").innerHTML = `
+    <div class="setup-total ${job.status}">
+      <p class="st-line">${line}</p>
+      <div class="bigbar" style="--p:${job.status === "done" ? 1 : pct}"><i></i></div>
+      <p class="st-meta">${meta.join("　·　")}</p>
+    </div>
+    ${slow}
+    <ul class="setup-list">${rows}</ul>`;
+  const foot = {
+    working: `<button class="ghost" id="setupStop">停止</button><button class="ink" id="setupBg">后台安装</button>`,
+    done: `<button class="seal-btn" id="setupDone">开始使用</button>`,
+    error: `<button class="ghost" data-close="setup">关闭</button>${canMirror ? `<button class="ghost" id="setupMirror">换加速镜像重试</button>` : ""}<button class="ink" id="setupRetry">重试没装上的</button>`,
+    stopped: `<button class="ghost" data-close="setup">关闭</button><button class="ink" id="setupRetry">继续安装</button>`,
+  }[job.status] || `<button class="ghost" data-close="setup">关闭</button>`;
+  $("#setupFoot").innerHTML = foot;
+  if (job.status === "working" && !$("#setupModal").hidden) {
+    setupUI.timer = setTimeout(async () => {
+      const st = await call("setup_status").catch(() => null);
+      if (st && !$("#setupModal").hidden) showSetupJob(st);
+    }, 500);
+  }
+  if (job.status !== "working") refreshBanner();
+}
+
+/* ---------- 反馈 ---------- */
+let feedbackText = "";
+async function openFeedback(extra) {
+  openModal("feedbackModal");
+  const body = $("#feedbackBody");
+  body.innerHTML = `<p class="about">读取中…</p>`;
+  let f;
+  try { f = await call("feedback_info", extra || null); } catch (e) { body.innerHTML = `<p class="err-text">${esc(e.message)}</p>`; return; }
+  feedbackText = f.text;
+  const rows = (list) => list.map((r) => `<div class="fb-row"><span>${esc(r.label)}</span><b>${esc(r.value)}</b></div>`).join("");
+  body.innerHTML = `
+    <p class="fb-lead">下载不了、报错，或者想支持新网站，都可以告诉我们。把下面这些信息一起发过来，查问题会快很多。</p>
+    ${f.task.length ? `<div class="fb-card task"><h4>这次出错的任务</h4>${rows(f.task)}</div>` : ""}
+    <div class="fb-card"><h4>你的电脑和拾影</h4>${rows(f.items)}</div>
+    <div class="fb-actions">
+      <button class="ink" id="fbCopy">复制这些信息</button>
+      <button class="ghost" id="fbIssue" data-url="${esc(f.issue_url)}">去 GitHub 反馈</button>
+    </div>
+    ${f.survey_url ? `<div class="fb-qr"><img src="feedback-qr.png" alt="反馈问卷二维码" width="132" height="132">
+      <div><b>没有 GitHub 账号？</b><p>微信扫码填问卷，不用登录，国内网络直接能打开。</p>
+      <button class="text" id="fbSurvey" data-url="${esc(f.survey_url)}">在浏览器打开问卷</button></div></div>` : ""}
+    <p class="fb-note">这些信息里没有你的 Cookie、密钥和下载记录。视频链接可能带个人信息，介意的话发之前把那一行删掉。</p>`;
+}
+$("#feedbackBtn").onclick = () => openFeedback();
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (_) { /* 退回旧办法 */ }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand("copy");
+  ta.remove();
+  return ok;
+}
+$("#feedbackModal").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.id === "fbCopy") toast((await copyText(feedbackText)) ? "已复制，粘贴到反馈里就行" : "复制失败，可以手动选中文字复制");
+  if (b.id === "fbIssue" || b.id === "fbSurvey") call("open_url", b.dataset.url).catch((err) => toast(err.message));
+});
+
 /* ---------- 启动 ---------- */
 (async function boot() {
   backend = await ready();
@@ -930,6 +1218,10 @@ function applyTheme() {
   refreshBanner();
   input.focus();
   checkClipboard();
+  // 第一次打开、还缺下载组件时，直接弹出安装向导
+  call("app_info").then((i) => {
+    if ((i.missing.length && !i.setup_skip) || (i.setup && i.setup.status === "working")) openSetup(!(i.setup && i.setup.status === "working"));
+  }).catch(() => {});
 })();
 
 })();
