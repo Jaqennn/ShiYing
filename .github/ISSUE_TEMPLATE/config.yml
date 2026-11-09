@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 怎么安装、第一次怎么用
+    url: https://github.com/Jaqennn/ShiYing#安装
+    about: 下载哪个文件、「Windows 已保护你的电脑」怎么点、组件怎么装
+  - name: 常见问题
+    url: https://github.com/Jaqennn/ShiYing#常见问题
+    about: 抖音无水印、公众号、B站 1080P、YouTube 验证、字幕等

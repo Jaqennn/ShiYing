@@ -9,6 +9,8 @@ import tempfile
 import time
 from pathlib import Path
 
+for stream in (sys.stdout, sys.stderr):   # GitHub 的 Windows 机器默认 cp1252，打印中文会报错
+    stream.reconfigure(encoding="utf-8")
 TMP = Path(tempfile.mkdtemp(prefix="shiying-smoke-"))
 os.environ["LOCALAPPDATA"] = str(TMP / "local")
 os.environ["APPDATA"] = str(TMP / "roaming")

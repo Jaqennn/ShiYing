@@ -1,0 +1,42 @@
+name: 下载不了 / 报错
+description: 哪个网站的视频下载失败、软件报错或者打不开
+labels: ["问题"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        谢谢反馈！拾影里点右上角「反馈」（或失败任务旁边的「反馈」），能一键复制系统和版本信息，贴到下面最后一栏就行。
+  - type: dropdown
+    id: site
+    attributes:
+      label: 哪个网站
+      options:
+        - 抖音
+        - 微信公众号
+        - 哔哩哔哩
+        - YouTube
+        - X（Twitter）
+        - 小红书
+        - 微博
+        - 其他网站（写在下面）
+        - 不是下载问题（安装、打开、字幕等）
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 比如：粘贴链接后提示什么、下到一半失败、安装向导卡在哪一步。有截图更好，直接拖进来。
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: 视频链接（可以不填）
+      description: 方便复现。链接里可能带个人信息，介意就不填。
+  - type: textarea
+    id: system
+    attributes:
+      label: 系统和版本信息（可以不填）
+      description: 拾影「反馈」页里点「复制这些信息」后粘贴到这里。
+      render: text

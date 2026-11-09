@@ -1,0 +1,16 @@
+name: 想支持新网站 / 新功能
+description: 希望拾影能下载某个网站，或者加一个功能
+labels: ["建议"]
+body:
+  - type: input
+    id: site
+    attributes:
+      label: 网站或功能
+      description: 比如：快手、视频号；或者「下载完自动关机」
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 具体说说
+      description: 平时怎么用、现在卡在哪。网站的话可以附一个示例链接。
