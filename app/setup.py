@@ -13,7 +13,7 @@ ESSENTIAL = ["yt-dlp", "ffmpeg", "deno"]
 DEFAULT_MIRROR = "https://ghfast.top/"
 SLOW_BPS = 200 * 1024   # 一项下载开始 SLOW_AFTER 秒后平均速度还低于这个数，就提示换加速镜像
 SLOW_AFTER = 12
-ENGINE_SIZE = {True: 685_000_000, False: 20_000_000}
+ENGINE_SIZE = {True: 685_000_000, False: 21_700_000}
 DESCS = {
     "yt-dlp": "下载引擎：YouTube、哔哩哔哩、X 和上千个网站都靠它",
     "ffmpeg": "把画面和声音合成一个文件，也负责转音频",

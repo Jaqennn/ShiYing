@@ -33,8 +33,17 @@ def _zip(members):
 
 
 class _Files(http.server.SimpleHTTPRequestHandler):
+    slow = False   # 测进度条时把下载限到每秒 800 KB 左右
+
     def log_message(self, *a):
         pass
+
+    def copyfile(self, source, outputfile):
+        if not self.slow:
+            return super().copyfile(source, outputfile)
+        while chunk := source.read(16384):
+            outputfile.write(chunk)
+            time.sleep(0.02)
 
 
 @pytest.fixture()
@@ -162,3 +171,22 @@ def test_setup_wizard_with_real_managers(env):
     assert all(it["status"] == "done" for it in st["items"]), st["items"]
     assert st["done"] >= st["total"] * 0.9
     assert mgr.plan()["missing"] == []
+
+
+def test_wizard_shows_live_progress(env, monkeypatch):
+    """下载过程中总进度、速度、剩余时间都要动起来（安装向导的进度条靠这些）。"""
+    monkeypatch.setattr(_Files, "slow", True)
+    cm = components.ComponentManager(env["settings"])
+    mgr = setup.SetupManager(env["settings"], cm, subtitle.Assets(env["settings"]))
+    mgr.start(["yt-dlp"])
+    seen = []
+    end = time.time() + 30
+    while mgr.status()["status"] == "working" and time.time() < end:
+        seen.append(mgr.status())
+        time.sleep(0.05)
+    assert mgr.status()["status"] == "done", mgr.status()
+    mid = [s for s in seen if 0 < s["done"] < s["total"]]
+    assert mid, "下载过程中总进度没动"
+    assert any(s["speed"] > 0 for s in mid) and any(s["eta"] for s in mid)
+    assert any("MB" in s["items"][0]["message"] for s in mid)
+    assert all(s["current"] == "yt-dlp" and s["index"] == 1 for s in mid)

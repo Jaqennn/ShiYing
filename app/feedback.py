@@ -17,11 +17,11 @@ _EDITIONS = {
 }
 
 
-def _reg(path, names):
+def _reg(path, names, user=False):
     import winreg
     out = {}
     try:
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as k:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER if user else winreg.HKEY_LOCAL_MACHINE, path) as k:
             for n in names:
                 try:
                     out[n] = winreg.QueryValueEx(k, n)[0]
@@ -37,7 +37,8 @@ def windows_label():
     if not IS_WIN:
         return platform.platform()
     v = _reg(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-             ["CurrentBuildNumber", "CurrentBuild", "UBR", "DisplayVersion", "ReleaseId", "EditionID"])
+             ["CurrentBuildNumber", "CurrentBuild", "UBR", "DisplayVersion", "ReleaseId", "EditionID",
+              "InstallationType", "ProductName"])
     try:
         build = int(v.get("CurrentBuildNumber") or v.get("CurrentBuild") or 0)
     except ValueError:
@@ -48,15 +49,23 @@ def windows_label():
     num = f"{build}.{v['UBR']}" if build and "UBR" in v else (str(build) if build else "")
     machine = platform.machine().upper()
     bits = "64 位" if machine in ("AMD64", "X86_64") else "ARM64" if machine == "ARM64" else machine
-    head = " ".join(x for x in (name, edition, ver) if x)
+    if str(v.get("InstallationType", "")).startswith("Server"):   # 服务器版的 ProductName 是准的（客户端版不准）
+        head = " ".join(x for x in (v.get("ProductName") or "Windows Server", ver) if x)
+    else:
+        head = " ".join(x for x in (name, edition, ver) if x)
     return f"{head}（{num}），{bits}" if num else f"{head}，{bits}"
 
 
 def webview2_version():
     if not IS_WIN:
         return ""
-    key = r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
-    return _reg(key, ["pv"]).get("pv", "")
+    # 装给所有用户的在 HKLM（32 位视图），只装给当前用户的在 HKCU
+    guid = r"Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+    for root, user in (("SOFTWARE\\WOW6432Node", False), ("SOFTWARE", False), ("Software", True)):
+        pv = _reg(root + "\\" + guid, ["pv"], user).get("pv", "")
+        if pv and pv != "0.0.0.0":
+            return pv
+    return ""
 
 
 def collect(comps, assets, extra=None):

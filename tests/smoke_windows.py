@@ -61,6 +61,11 @@ def main():
     assert subtitle.whisper_exe(), "识别引擎没装上"
     print("识别引擎", subtitle.engine_build())
     assert comps.missing() == []
+    eng = sum(f.stat().st_size for f in (BIN_DIR / "whisper").rglob("*") if f.is_file())
+    used = sum(f.stat().st_size for f in BIN_DIR.rglob("*") if f.is_file()) - eng
+    print(f"下载组件占用 {used} 字节（{used / 1048576:.0f} MB），识别引擎 CPU 版占用 {eng} 字节（{eng / 1048576:.0f} MB）")
+    for f in sorted(BIN_DIR.glob("*.exe")):
+        print(f"  {f.name} {f.stat().st_size} 字节")
 
     print("—— 反馈页信息 ——")
     print(feedback.collect(comps.status(), assets.status())["text"])

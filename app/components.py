@@ -28,7 +28,7 @@ SOURCES = {
         "members": ["ffmpeg.exe", "ffprobe.exe"],
         "desc": "合并音视频、转音频",
         "repo": "yt-dlp/FFmpeg-Builds", "tag": "latest", "asset": "ffmpeg-master-latest-win64-gpl.zip",
-        "approx": 150_000_000,
+        "approx": 202_000_000,
     },
     "deno": {
         "url": f"{GH}/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip",
@@ -36,7 +36,7 @@ SOURCES = {
         "members": ["deno.exe"],
         "desc": "YouTube 解签名所需的 JS 运行时",
         "repo": "denoland/deno", "tag": "latest-release", "asset": "deno-x86_64-pc-windows-msvc.zip",
-        "approx": 45_000_000,
+        "approx": 43_000_000,
     },
 }
 

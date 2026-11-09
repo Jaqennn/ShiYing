@@ -64,7 +64,7 @@ A free, open-source **Windows GUI video downloader** for Douyin (no watermark), 
 
 - Windows 10 或 Windows 11，64 位
 - Edge WebView2 运行时：Windows 11 自带，Windows 10 绝大多数已经装了
-- 硬盘空间：拾影本身约 40 MB，下载组件约 220 MB；AI 中文字幕另外需要 0.2～1.3 GB（CPU 版加快速模型最小，GPU 版加精准模型最大）
+- 硬盘空间：拾影本身不到 30 MB；组件要下载约 260 MB，解压后占用更多一些（见下面「组件放在哪」）；AI 中文字幕另外需要 0.2～1.3 GB（CPU 版加快速模型最小，GPU 版加精准模型最大）
 
 ## 下载
 
@@ -79,7 +79,7 @@ A free, open-source **Windows GUI video downloader** for Douyin (no watermark), 
 1. 右键下载好的 `ShiYing-windows-x64.zip` →「全部解压缩」，放到普通文件夹，比如 `D:\Tools\拾影`。不要放进 `C:\Program Files`，那里没有写入权限。
 2. 打开解压出来的 `ShiYing` 文件夹，双击 `ShiYing.exe`。它要和旁边的 `_internal` 文件夹放在一起，想挪位置就整个文件夹一起挪。
 3. 如果弹出「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。拾影没有买数字签名证书，第一次打开都会这样提示。
-4. 第一次打开会弹出安装向导，点「一键安装」，等进度条走完。装 yt-dlp、ffmpeg、deno 一共约 220 MB，网速快一两分钟就好。
+4. 第一次打开会弹出安装向导，点「一键安装」，等进度条走完。yt-dlp、ffmpeg、deno 一共要下载约 260 MB，网速快一两分钟就好。
 5. 想以后方便打开：右键 `ShiYing.exe` →「发送到」→「桌面快捷方式」（Windows 11 要先点「显示更多选项」）。
 
 安装向导下载很慢时，点「换加速镜像」；还不行就开代理再试，详见[常见问题](#常见问题)。

@@ -65,8 +65,8 @@
   const plan = {
     items: [
       { key: "yt-dlp", group: "download", label: "yt-dlp", desc: "下载引擎：YouTube、哔哩哔哩、X 和上千个网站都靠它", size: 23.6e6, installed: false },
-      { key: "ffmpeg", group: "download", label: "ffmpeg", desc: "把画面和声音合成一个文件，也负责转音频", size: 150e6, installed: false },
-      { key: "deno", group: "download", label: "deno", desc: "YouTube 必需，用来解开视频地址", size: 45e6, installed: false },
+      { key: "ffmpeg", group: "download", label: "ffmpeg", desc: "把画面和声音合成一个文件，也负责转音频", size: 202e6, installed: false },
+      { key: "deno", group: "download", label: "deno", desc: "YouTube 必需，用来解开视频地址", size: 43e6, installed: false },
       { key: "engine", group: "subtitle", label: "识别引擎", desc: "GPU 版：检测到 NVIDIA 显卡，识别快很多", size: 685e6, installed: false, gpu: true },
       { key: "model:base.en", group: "model", label: "快速", desc: "英文专用，速度最快，准确度一般", size: 148e6, installed: false },
       { key: "model:small.en", group: "model", label: "均衡", desc: "英文专用，速度和准确度兼顾", size: 488e6, installed: false },
@@ -81,7 +81,7 @@
     job = { status: "working", mirror: "", items: keys.map((k) => ({ key: k, label: labelOf(k), size: plan.items.find((i) => i.key === k).size, status: "waiting", done: 0, total: 0, message: "" })) };
     job.items.forEach((it, i) => { if (i < at) Object.assign(it, { status: "done", done: it.size, total: it.size, message: "已安装" }); });
   }
-  if (demo === "installing") { startJob(["yt-dlp", "ffmpeg", "deno"], 1); job.items[1].done = 52.4e6; job.items[1].total = 150e6; }
+  if (demo === "installing") { startJob(["yt-dlp", "ffmpeg", "deno"], 1); job.items[1].done = 52.4e6; job.items[1].total = 202e6; }
   function jobView() {
     if (!job) return { status: "idle", items: [], done: 0, total: 0, speed: 0, eta: null, current: null, index: 0, count: 0, slow: false };
     const cur = job.items.findIndex((it) => it.status === "working" || it.status === "waiting");
